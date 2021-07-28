@@ -40,8 +40,8 @@ sourceSets {
 }
 
 dependencies {
-    compile 'com.google.guava:guava:21.0'
-    compile 'org.apache.logging.log4j:log4j-core:2.0-beta9'
+    compile 'com.google.guava:guava:30.1.1-jre'
+    compile 'org.apache.logging.log4j:log4j-core:2.14.1'
     compile 'com.google.code.gson:gson:2.2.4'
 
     implementation "org.ow2.asm:asm-tree:$asmVersion"

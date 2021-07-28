@@ -24,21 +24,20 @@
  */
 package org.spongepowered.asm.mixin.refmap;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Map.Entry;
-
+import com.google.common.base.Charsets;
+import com.google.common.base.Strings;
+import com.google.common.io.Files;
+import com.google.common.io.LineProcessor;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.MixinEnvironment.Option;
 
-import com.google.common.base.Charsets;
-import com.google.common.base.Strings;
-import com.google.common.io.Files;
-import com.google.common.io.LineProcessor;
+import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
 
 /**
  * This adapter is designed to address a problem with mixins when "deobfCompile"
@@ -219,7 +218,7 @@ public final class RemappingReferenceMapper implements IReferenceMapper {
         }
                 
         try {
-            Files.readLines(file, Charsets.UTF_8, new LineProcessor<Object>() {
+            Files.asCharSource(file, Charsets.UTF_8).readLines(new LineProcessor<Object>() {
                 
                 @Override
                 public Object getResult() {

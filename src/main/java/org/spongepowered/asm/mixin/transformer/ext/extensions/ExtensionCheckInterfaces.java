@@ -24,15 +24,11 @@
  */
 package org.spongepowered.asm.mixin.transformer.ext.extensions;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.PrintStream;
-import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.Set;
-
+import com.google.common.base.Charsets;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
+import com.google.common.io.FileWriteMode;
+import com.google.common.io.Files;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.objectweb.asm.tree.ClassNode;
@@ -48,10 +44,14 @@ import org.spongepowered.asm.util.Constants;
 import org.spongepowered.asm.util.PrettyPrinter;
 import org.spongepowered.asm.util.SignaturePrinter;
 
-import com.google.common.base.Charsets;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Multimap;
-import com.google.common.io.Files;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Checks whether interfaces declared on mixin target classes are actually fully
@@ -112,14 +112,14 @@ public class ExtensionCheckInterfaces implements IExtension {
         this.csv.getParentFile().mkdirs();
 
         try {
-            Files.write("Class,Method,Signature,Interface\n", this.csv, Charsets.ISO_8859_1);
+            Files.asCharSink(this.csv, Charsets.ISO_8859_1).write("Class,Method,Signature,Interface\n");
         } catch (IOException ex) {
             // well this sucks
         }
 
         try {
             String dateTime = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-            Files.write("Mixin Implementation Report generated on " + dateTime + "\n", this.report, Charsets.ISO_8859_1);
+            Files.asCharSink(this.report, Charsets.ISO_8859_1).write("Mixin Implementation Report generated on " + dateTime + "\n");
         } catch (IOException ex) {
             // hmm :(
         }
@@ -218,7 +218,8 @@ public class ExtensionCheckInterfaces implements IExtension {
 
     private void appendToCSVReport(String className, Method method, String iface) {
         try {
-            Files.append(String.format("%s,%s,%s,%s\n", className, method.getName(), method.getDesc(), iface), this.csv, Charsets.ISO_8859_1);
+            Files.asCharSink(this.csv, Charsets.ISO_8859_1, FileWriteMode.APPEND)
+                    .write(String.format("%s,%s,%s,%s\n", className, method.getName(), method.getDesc(), iface));
         } catch (IOException ex) {
             // Not the end of the world
         }
