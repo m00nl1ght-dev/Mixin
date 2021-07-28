@@ -102,6 +102,15 @@ sourceSets {
         sourceCompatibility = '1.8'
         targetCompatibility = '1.8'
     }
+    universalTest {
+        compileClasspath += main.output
+        runtimeClasspath += main.output
+        runtimeClasspath += legacy.output
+    }
+    universalTestExample {
+        compileClasspath += universalTest.output
+        compileClasspath += main.output
+    }
 }
 
 // Project dependencies
@@ -169,6 +178,10 @@ dependencies {
     bridgeCompile "org.ow2.asm:asm-commons:$legacyForgeAsmVersion"
     
     legacyCompile "org.ow2.asm:asm-tree:$asmVersion"
+
+    // Universal
+    universalTestCompile configurations.compile
+    universalTestImplementation configurations.implementation
 }
 
 javadoc {

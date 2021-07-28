@@ -24,7 +24,7 @@
  */
 package org.spongepowered.asm.service.mojang;
 
-import javax.annotation.Resource;
+// import javax.annotation.Resource;
 
 import org.spongepowered.asm.service.ILegacyClassTransformer;
 
@@ -59,7 +59,7 @@ class LegacyTransformerHandle implements ILegacyClassTransformer {
      */
     @Override
     public boolean isDelegationExcluded() {
-        return this.transformer.getClass().getAnnotation(Resource.class) != null;
+        return false; //this.transformer.getClass().getAnnotation(Resource.class) != null;
     }
 
     /* (non-Javadoc)
