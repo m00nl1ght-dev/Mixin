@@ -33,7 +33,6 @@ import org.apache.logging.log4j.Logger;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
-import org.spongepowered.asm.mixin.throwables.CompanionPluginError;
 import org.spongepowered.asm.service.IMixinService;
 
 import com.google.common.base.Strings;
@@ -145,20 +144,13 @@ class PluginHandle {
         }
         
         if (this.mode == CompatibilityMode.COMPATIBLE) {
-            try {
-                this.applyLegacy(this.mdPreApply, targetClassName, targetClass, mixinClassName, mixinInfo);
-            } catch (Exception ex) {
-                this.mode = CompatibilityMode.FAILED;
-                throw ex;
-            }
-            return;
+            throw new UnsupportedOperationException("CompatibilityMode not supported");
         } 
 
         try {
             this.plugin.preApply(targetClassName, targetClass, mixinClassName, mixinInfo);
         } catch (AbstractMethodError ex) {
             this.mode = CompatibilityMode.COMPATIBLE;
-            this.initReflection();
             this.preApply(targetClassName, targetClass, mixinClassName, mixinInfo);
         }
     }
@@ -176,58 +168,14 @@ class PluginHandle {
         }
         
         if (this.mode == CompatibilityMode.COMPATIBLE) {
-            try {
-                this.applyLegacy(this.mdPostApply, targetClassName, targetClass, mixinClassName, mixinInfo);
-            } catch (Exception ex) {
-                this.mode = CompatibilityMode.FAILED;
-                throw ex;
-            }
-            return;
+            throw new UnsupportedOperationException("CompatibilityMode not supported");
         } 
 
         try {
             this.plugin.postApply(targetClassName, targetClass, mixinClassName, mixinInfo);
         } catch (AbstractMethodError ex) {
             this.mode = CompatibilityMode.COMPATIBLE;
-            this.initReflection();
             this.postApply(targetClassName, targetClass, mixinClassName, mixinInfo);
         }
     }
-
-    private void initReflection() {
-        if (this.mdPreApply != null) {
-            return;
-        }
-        
-        try {
-            Class<?> pluginClass = this.plugin.getClass();
-            this.mdPreApply = pluginClass.getMethod("preApply", String.class, org.spongepowered.asm.lib.tree.ClassNode.class, String.class,
-                    IMixinInfo.class);
-            this.mdPostApply = pluginClass.getMethod("postApply", String.class, org.spongepowered.asm.lib.tree.ClassNode.class, String.class,
-                    IMixinInfo.class);
-        } catch (Throwable th) {
-            PluginHandle.logger.catching(th);
-        }
-    }
-
-    private void applyLegacy(Method method, String targetClassName, ClassNode targetClass, String mixinClassName, IMixinInfo mixinInfo) {
-        try {
-            method.invoke(this.plugin, targetClassName, new org.spongepowered.asm.lib.tree.ClassNode(targetClass), mixinClassName, mixinInfo);
-        } catch (LinkageError err) {
-            throw new CompanionPluginError(this.apiError("Accessing [" + err.getMessage() + "]"), err);
-        } catch (IllegalAccessException ex) {
-            throw new CompanionPluginError(this.apiError("Fallback failed [" + ex.getMessage() + "]"), ex);
-        } catch (IllegalArgumentException ex) {
-            throw new CompanionPluginError(this.apiError("Fallback failed [" + ex.getMessage() + "]"), ex);
-        } catch (InvocationTargetException ex) {
-            Throwable th = ex.getCause() != null ? ex.getCause() : ex;
-            throw new CompanionPluginError(this.apiError("Fallback failed [" + th.getMessage() + "]"), th);
-        }
-    }
-
-    private String apiError(String message) {
-        return String.format("Companion plugin attempted to use a deprected API in [%s] plugin [%s]: %s",
-                this.parent, this.plugin.getClass().getName(), message);
-    }
-
 }
