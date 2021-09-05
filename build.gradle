@@ -10,7 +10,7 @@ buildscript {
 
 apply plugin: 'java'
 apply plugin: 'license'
-apply plugin: 'checkstyle'
+// apply plugin: 'checkstyle'
 apply plugin: 'eclipse'
 apply plugin: 'idea'
 
@@ -42,7 +42,6 @@ sourceSets {
 dependencies {
     compile 'com.google.guava:guava:30.1.1-jre'
     compile 'org.apache.logging.log4j:log4j-core:2.14.1'
-    compile 'com.google.code.gson:gson:2.2.4'
 
     implementation "org.ow2.asm:asm-tree:$asmVersion"
     implementation "org.ow2.asm:asm-commons:$asmVersion"
@@ -73,6 +72,7 @@ license {
     }
 }
 
+/*
 checkstyle {
     configProperties = [
         "name"        : project.name,
@@ -83,6 +83,7 @@ checkstyle {
     configFile = file("checkstyle.xml")
     toolVersion = '8.43'
 }
+*/
 
 tasks.withType(JavaCompile) {
     options.compilerArgs += ['-Xlint:all', '-Xlint:-path', '-proc:none']

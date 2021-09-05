@@ -24,17 +24,12 @@
  */
 package dev.m00nl1ght.mixin;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Closeables;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.ClassNode;
-import org.spongepowered.asm.launch.platform.container.ContainerHandleURI;
-import org.spongepowered.asm.launch.platform.container.ContainerHandleVirtual;
-import org.spongepowered.asm.launch.platform.container.IContainerHandle;
 import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.MixinEnvironment.CompatibilityLevel;
-import org.spongepowered.asm.mixin.MixinEnvironment.Phase;
 import org.spongepowered.asm.mixin.transformer.MixinTransformer;
 import org.spongepowered.asm.service.*;
 import org.spongepowered.asm.transformers.MixinClassReader;
@@ -43,8 +38,6 @@ import org.spongepowered.asm.util.perf.Profiler.Section;
 
 import java.io.File;
 import java.io.InputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Collection;
@@ -61,7 +54,14 @@ public class UniversalMixinService extends MixinServiceAbstract implements IClas
     public final File classSource = new File("./build/classes/java/universalTestExample/");
     public final File resDir = new File("./build/resources/universalTestExample/");
 
+    private MixinEnvironment environment;
     private UniversalTestClassLoader classLoader;
+
+    public void init() {
+        environment = new MixinEnvironment();
+        classLoader = new UniversalTestClassLoader(ClassLoader.getSystemClassLoader(), classSource, resDir);
+        classLoader.setTransformer(new MixinTransformer(environment));
+    }
 
     public UniversalTestClassLoader getClassLoader() {
         return classLoader;
@@ -78,47 +78,8 @@ public class UniversalMixinService extends MixinServiceAbstract implements IClas
     }
 
     @Override
-    public void prepare() {
-        classLoader = new UniversalTestClassLoader(ClassLoader.getSystemClassLoader(), classSource, resDir);
-    }
-
-    @Override
-    public Phase getInitialPhase() {
-        return Phase.PREINIT;
-    }
-
-    @Override
     public CompatibilityLevel getMaxCompatibilityLevel() {
         return CompatibilityLevel.JAVA_8;
-    }
-
-    @Override
-    public void init() {
-        super.init();
-    }
-
-    @Override
-    public Collection<String> getPlatformAgents() {
-        return ImmutableList.of();
-    }
-    
-    @Override
-    public IContainerHandle getPrimaryContainer() {
-        URI uri;
-        try {
-            uri = this.getClass().getProtectionDomain().getCodeSource().getLocation().toURI();
-            return new ContainerHandleURI(uri);
-        } catch (URISyntaxException ex) {
-            ex.printStackTrace();
-        }
-        return new ContainerHandleVirtual(this.getName());
-    }
-    
-    @Override
-    public Collection<IContainerHandle> getMixinContainers() {
-        ImmutableList.Builder<IContainerHandle> list = ImmutableList.builder();
-        // list.add(new ContainerHandleURI(classSource.toURI()));
-        return list.build();
     }
 
     @Override
@@ -159,16 +120,6 @@ public class UniversalMixinService extends MixinServiceAbstract implements IClas
     @Override
     public Class<?> findAgentClass(String name, boolean initialize) throws ClassNotFoundException {
         return Class.forName(name, initialize, this.getClass().getClassLoader());
-    }
-
-    @Override
-    public void beginPhase() {
-        classLoader.setTransformer(new MixinTransformer());
-    }
-
-    @Override
-    public void checkEnv(Object bootSource) {
-
     }
 
     @Override

@@ -27,9 +27,7 @@ package org.spongepowered.asm.service;
 import java.io.InputStream;
 import java.util.Collection;
 
-import org.spongepowered.asm.launch.platform.container.IContainerHandle;
 import org.spongepowered.asm.mixin.MixinEnvironment.CompatibilityLevel;
-import org.spongepowered.asm.mixin.MixinEnvironment.Phase;
 import org.spongepowered.asm.util.ReEntranceLock;
 
 /**
@@ -51,43 +49,6 @@ public interface IMixinService {
      * True if this service type is valid in the current environment
      */
     public abstract boolean isValid();
-    
-    /**
-     * Called at subsystem boot
-     */
-    public abstract void prepare();
-
-    /**
-     * Get the initial subsystem phase
-     */
-    public abstract Phase getInitialPhase();
-    
-    /**
-     * Called when the subsystem is offering internal components to the service,
-     * the service can determine whether to retain or ignore the component based
-     * on its own requirements.
-     * 
-     * @param internal Internal component being offered
-     */
-    public abstract void offer(IMixinInternal internal);
-    
-    /**
-     * Called at the end of subsystem boot
-     */
-    public abstract void init();
-
-    /**
-     * Called whenever a new phase is started 
-     */
-    public abstract void beginPhase();
-
-    /**
-     * Check whether the supplied object is a valid boot source for mixin
-     * environment
-     * 
-     * @param bootSource boot source
-     */
-    public abstract void checkEnv(Object bootSource);
     
     /**
      * Get the transformer re-entrance lock for this service, the transformer
@@ -128,24 +89,6 @@ public interface IMixinService {
      * functionality.</b>
      */
     public abstract IMixinAuditTrail getAuditTrail();
-    
-    /**
-     * Get additional platform agents for this service 
-     */
-    public abstract Collection<String> getPlatformAgents();
-    
-    /**
-     * Get the primary container for the current environment, this is usually
-     * the container which contains the Mixin classes but can be another type
-     * of container as required by the environment
-     */
-    public abstract IContainerHandle getPrimaryContainer();
-    
-    /**
-     * Get a collection of containers in the current environment which contain
-     * mixins we should process 
-     */
-    public abstract Collection<IContainerHandle> getMixinContainers();
     
     /**
      * Get a resource as a stream from the appropriate classloader, this is

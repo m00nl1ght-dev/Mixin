@@ -70,11 +70,6 @@ public final class MixinService {
     private IMixinService service = null;
 
     /**
-     * Global Property Service
-     */
-    private IGlobalPropertyService propertyService;
-
-    /**
      * Singleton pattern
      */
     private MixinService() {
@@ -159,40 +154,4 @@ public final class MixinService {
         throw new ServiceNotAvailableError("No mixin host service is available. Services: " + Joiner.on(", ").join(badServices) + brokenServiceNote);
     }
 
-    /**
-     * Blackboard
-     */
-    public static IGlobalPropertyService getGlobalPropertyService() {
-        return MixinService.getInstance().getGlobalPropertyServiceInstance();
-    }
-
-    /**
-     * Retrieves the GlobalPropertyService Instance... FactoryProviderBean...
-     * Observer...InterfaceStream...Function...Broker... help me why won't it
-     * stop
-     */
-    private IGlobalPropertyService getGlobalPropertyServiceInstance() {
-        if (this.propertyService == null) {
-            this.propertyService = this.initPropertyService();
-        }
-        return this.propertyService;
-    }
-
-    private IGlobalPropertyService initPropertyService() {
-        ServiceLoader<IGlobalPropertyService> serviceLoader = ServiceLoader.<IGlobalPropertyService>load(IGlobalPropertyService.class,
-                this.getClass().getClassLoader());
-        
-        Iterator<IGlobalPropertyService> iter = serviceLoader.iterator();
-        while (iter.hasNext()) {
-            try {
-                IGlobalPropertyService service = iter.next();
-                return service;
-            } catch (ServiceConfigurationError serviceError) {
-//                serviceError.printStackTrace();
-            } catch (Throwable th) {
-//                th.printStackTrace();
-            }
-        }
-        throw new ServiceNotAvailableError("No mixin global property service is available");
-    }
 }

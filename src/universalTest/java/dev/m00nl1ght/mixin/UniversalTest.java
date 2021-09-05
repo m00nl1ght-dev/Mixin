@@ -24,8 +24,6 @@
  */
 package dev.m00nl1ght.mixin;
 
-import org.spongepowered.asm.launch.MixinBootstrap;
-import org.spongepowered.asm.mixin.Mixins;
 import org.spongepowered.asm.service.MixinService;
 
 /**
@@ -44,10 +42,13 @@ public final class UniversalTest {
      */
     public static void main(String[] args) throws Exception {
 
-        MixinBootstrap.init();
-        Mixins.addConfiguration(CONFIG_FILE);
-
         final UniversalMixinService service = (UniversalMixinService) MixinService.getService();
+        service.init();
+
+        // MixinEnvironment.init(MixinEnvironment.Phase.PREINIT);
+
+        // Mixins.addConfiguration(CONFIG_FILE);
+
         // service.getClassLoader().addExcludedPackage("dev.m00nl1ght.mixin.example.mixins");
         final Class<?> testClass = service.getClassLoader().loadClass(TEST_CLASS_NAME);
         final TestInterface testInstance = (TestInterface) testClass.getConstructor().newInstance();
