@@ -27,9 +27,8 @@ package org.spongepowered.asm.mixin.transformer;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import org.spongepowered.asm.logging.Level;
+import org.spongepowered.asm.logging.ILogger;
 import org.spongepowered.asm.launch.MixinInitialisationError;
 import org.objectweb.asm.tree.InsnList;
 import org.spongepowered.asm.mixin.MixinEnvironment;
@@ -79,7 +78,7 @@ public final class MixinConfig implements IMixinConfig {
         
     }
 
-    private final Logger logger = LogManager.getLogger("mixin");
+    private final ILogger logger = MixinService.getService().getLogger("mixin");
 
     /**
      * Minimum version of the mixin subsystem required to correctly apply mixins
@@ -147,6 +146,8 @@ public final class MixinConfig implements IMixinConfig {
      * version, track warned level here 
      */
     private transient int warnedClassVersion = 0;
+    
+    private transient Map<String, Object> decorations;
 
     public boolean init(MixinEnvironment environment) {
         this.verboseLogging |= environment.getOption(Option.DEBUG_VERBOSE);
@@ -180,14 +181,20 @@ public final class MixinConfig implements IMixinConfig {
             throw new MixinInitialisationError(String.format("Mixin config %s requires compatibility level %s which is prohibited by %s",
                     this.name, this.compatibilityLevel, currentLevel));
         }
-        
+
+        CompatibilityLevel minCompatibilityLevel = MixinEnvironment.getMinCompatibilityLevel();
+        if (this.compatibilityLevel.isLessThan(minCompatibilityLevel)) {
+            this.logger.log(this.verboseLogging ? Level.INFO : Level.DEBUG,
+                    "Compatibility level {} specified by {} is lower than the default level supported by the current mixin service ({}).",
+                    this.compatibilityLevel, this, minCompatibilityLevel);
+        }
+
         // Required level is higher than highest version we support, this possibly
         // means that a shaded mixin dependency has been usurped by an old version,
         // or the mixin author is trying to elevate the compatibility level beyond
         // the versions currently supported
         if (CompatibilityLevel.MAX_SUPPORTED.isLessThan(this.compatibilityLevel)) {
-            Level logLevel = this.verboseLogging ? Level.WARN : Level.DEBUG;
-            this.logger.log(logLevel,
+            this.logger.log(this.verboseLogging ? Level.WARN : Level.DEBUG,
                     "Compatibility level {} specified by {} is higher than the maximum level supported by this version of mixin ({}).",
                     this.compatibilityLevel, this, CompatibilityLevel.MAX_SUPPORTED);
         }
@@ -476,6 +483,40 @@ public final class MixinConfig implements IMixinConfig {
     }
 
     @Override
+    public <V> void decorate(String key, V value) {
+        if (this.decorations == null) {
+            this.decorations = new HashMap<String, Object>();
+        }
+        if (this.decorations.containsKey(key)) {
+            throw new IllegalArgumentException(String.format("Decoration with key '%s' already exists on config %s", key, this));
+        }
+        this.decorations.put(key, value);
+    }
+    
+    /**
+     * Get whether this node is decorated with the specified key
+     * 
+     * @param key meta key
+     * @return true if the specified decoration exists
+     */
+    @Override
+    public boolean hasDecoration(String key) {
+        return this.decorations != null && this.decorations.get(key) != null;
+    }
+    
+    /**
+     * Get the specified decoration
+     * 
+     * @param key meta key
+     * @param <V> value type
+     * @return decoration value or null if absent
+     */
+    @Override
+    @SuppressWarnings("unchecked")
+    public <V> V getDecoration(String key) {
+        return (V) (this.decorations == null ? null : this.decorations.get(key));
+    }
+
     public Level getLoggingLevel() {
         return this.verboseLogging ? Level.INFO : Level.DEBUG;
     }

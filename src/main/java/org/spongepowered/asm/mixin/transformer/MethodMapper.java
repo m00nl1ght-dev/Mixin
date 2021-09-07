@@ -32,6 +32,7 @@ import org.objectweb.asm.tree.MethodNode;
 import org.spongepowered.asm.mixin.injection.struct.InjectionInfo;
 import org.spongepowered.asm.mixin.transformer.ClassInfo.Method;
 import org.spongepowered.asm.mixin.transformer.MixinInfo.MixinMethodNode;
+import org.spongepowered.asm.service.MixinService;
 import org.spongepowered.asm.util.Counter;
 
 import java.util.ArrayList;
@@ -47,7 +48,7 @@ class MethodMapper {
     /**
      * Logger
      */
-    private static final Logger logger = LogManager.getLogger("mixin");
+    private static final ILogger logger = MixinService.getService().getLogger("mixin");
     
     private static final List<String> classes = new ArrayList<String>();
     

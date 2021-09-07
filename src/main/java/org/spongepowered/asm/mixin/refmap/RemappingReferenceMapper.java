@@ -83,7 +83,7 @@ public final class RemappingReferenceMapper implements IReferenceMapper {
     /**
      * Logger
      */
-    private static final Logger logger = LogManager.getLogger("mixin");
+    private static final ILogger logger = MixinService.getService().getLogger("mixin");
 
     /**
      * Loaded srgs, stored as a mapping of filename to mappings. Global cache so

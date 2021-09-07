@@ -46,9 +46,15 @@ import com.google.common.collect.ImmutableList.Builder;
 public abstract class MixinServiceAbstract implements IMixinService {
 
     /**
-     * Logger 
+     * Logger adapter, replacement for log4j2 logger as services should use
+     * their own loggers now in order to avoid contamination
      */
-    protected static final Logger logger = LogManager.getLogger("mixin");
+    private static ILogger logger;
+
+    /**
+     * Cached logger adapters 
+     */
+    private static final Map<String, ILogger> loggers = new HashMap<String, ILogger>();
 
     /**
      * Transformer re-entrance lock, shared between the mixin transformer and
@@ -60,6 +66,12 @@ public abstract class MixinServiceAbstract implements IMixinService {
      * Detected side name
      */
     private String sideName;
+    
+    protected MixinServiceAbstract() {
+        if (MixinServiceAbstract.logger == null) {
+            MixinServiceAbstract.logger = this.getLogger("mixin");
+        }
+    }
     
     /* (non-Javadoc)
      * @see org.spongepowered.asm.service.IMixinService
@@ -97,6 +109,19 @@ public abstract class MixinServiceAbstract implements IMixinService {
         }
         
         return Constants.SIDE_UNKNOWN;
+    }
+
+    @Override
+    public synchronized ILogger getLogger(final String name) {
+        ILogger logger = MixinServiceAbstract.loggers.get(name);
+        if (logger == null) {
+            MixinServiceAbstract.loggers.put(name, logger = this.createLogger(name));
+        }
+        return logger;
+    }
+
+    protected ILogger createLogger(final String name) {
+        return new LoggerAdapterDefault(name);
     }
 
 }

@@ -77,6 +77,34 @@ public interface IMixinConfig {
      * the mixin annotation still override this value
      */
     public int getDefaultMixinPriority();
+    
+    /**
+     * Decorate this config with arbitrary metadata for debugging or
+     * compatibility purposes
+     * 
+     * @param key meta key
+     * @param value meta value
+     * @param <V> value type
+     * @throws IllegalArgumentException if the specified key exists already
+     */
+    public abstract <V> void decorate(String key, V value);
+    
+    /**
+     * Get whether this node is decorated with the specified key
+     * 
+     * @param key meta key
+     * @return true if the specified decoration exists
+     */
+    public abstract boolean hasDecoration(String key);
+    
+    /**
+     * Get the specified decoration
+     * 
+     * @param key meta key
+     * @param <V> value type
+     * @return decoration value or null if absent
+     */
+    public abstract <V> V getDecoration(String key);
 
     /**
      * Get the defined value for the {@link Inject#require} parameter on

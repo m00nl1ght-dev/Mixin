@@ -47,7 +47,6 @@ import org.spongepowered.asm.mixin.throwables.MixinPrepareError;
 import org.spongepowered.asm.mixin.transformer.MixinInfo.Variant;
 import org.spongepowered.asm.mixin.transformer.ext.Extensions;
 import org.spongepowered.asm.mixin.transformer.ext.IHotSwap;
-import org.spongepowered.asm.mixin.transformer.ext.extensions.ExtensionCheckClass.ValidationFailedException;
 import org.spongepowered.asm.mixin.transformer.ext.extensions.ExtensionClassExporter;
 import org.spongepowered.asm.mixin.transformer.meta.MixinMerged;
 import org.spongepowered.asm.mixin.transformer.throwables.IllegalClassLoadError;
@@ -383,8 +382,8 @@ class MixinProcessor {
 
     }
 
-    static final Logger logger = LogManager.getLogger("mixin");
-
+    static final ILogger logger = MixinService.getService().getLogger("mixin");
+    
     private final IMixinService service = MixinService.getService();
 
     private final List<ConfigWrapper> configs = new ArrayList<ConfigWrapper>();
@@ -413,9 +412,9 @@ class MixinProcessor {
     private final Extensions extensions;
 
     private final IHotSwap hotSwapper;
-
-    private final MixinPostProcessor postProcessor;
-
+    
+    private final MixinCoprocessors coprocessors = new MixinCoprocessors();
+    
     private final Profiler profiler;
 
     private final IMixinAuditTrail auditTrail;
@@ -434,15 +433,19 @@ class MixinProcessor {
      */
     private int transformedCount = 0;
 
-    MixinProcessor(MixinEnvironment environment, Extensions extensions, IHotSwap hotSwapper) {
+    MixinProcessor(MixinEnvironment environment, Extensions extensions, IHotSwap hotSwapper, MixinCoprocessorNestHost nestHostCoprocessor) {
         this.lock = this.service.getReEntranceLock();
 
         this.environment = environment;
         this.extensions = extensions;
         this.hotSwapper = hotSwapper;
-        this.postProcessor = new MixinPostProcessor(this.sessionId);
         
-        this.profiler = environment.getProfiler();
+        this.coprocessors.add(new MixinCoprocessorPassthrough());
+        this.coprocessors.add(new MixinCoprocessorSyntheticInner());
+        this.coprocessors.add(new MixinCoprocessorAccessor(this.sessionId));
+        this.coprocessors.add(nestHostCoprocessor);
+        
+        this.profiler = Profiler.getProfiler("mixin");
         this.auditTrail = this.service.getAuditTrail();
     }
 
@@ -452,7 +455,7 @@ class MixinProcessor {
      * @param environment current environment
      */
     public void audit(MixinEnvironment environment) {
-        Logger auditLogger = LogManager.getLogger("mixin/audit");
+        ILogger auditLogger = MixinService.getService().getLogger("mixin.audit");
 
         for (String target : unhandledTargets) {
             try {
@@ -469,7 +472,7 @@ class MixinProcessor {
         }
         
         if (environment.getOption(Option.DEBUG_PROFILER)) {
-            this.profiler.printSummary();
+            Profiler.printAuditSummary();
         }
     }
 
@@ -499,18 +502,21 @@ class MixinProcessor {
             }
         }
         
-        boolean success = false;
+        boolean transformed = false;
         
         try {
-            if (this.postProcessor.canProcess(name)) {
+            ProcessResult result = this.coprocessors.process(name, targetClassNode);
+            transformed |= result.isTransformed();
+            
+            if (result.isPassthrough()) {
+                for (MixinCoprocessor coprocessor : this.coprocessors) {
+                    transformed |= coprocessor.postProcess(name, targetClassNode);
+                }
                 if (this.auditTrail != null) {
                     this.auditTrail.onPostProcess(name);
                 }
-                Section postTimer = this.profiler.begin("postprocessor");
-                success = this.postProcessor.processClass(name, targetClassNode);
-                postTimer.end();
                 this.extensions.export(environment, name, false, targetClassNode);
-                return success;
+                return transformed;
             }
 
             ConfigWrapper packageOwnedByConfig = null;
@@ -529,7 +535,7 @@ class MixinProcessor {
                 // AMS - Temp passthrough for injection points and dynamic selectors. Moving to service in 0.9
                 ClassInfo targetInfo = ClassInfo.fromClassNode(environment, targetClassNode);
                 if (targetInfo.hasSuperClass(InjectionPoint.class) || targetInfo.hasSuperClass(ITargetSelectorDynamic.class)) {
-                    return false;
+                    return transformed;
                 }
                 
                 throw new IllegalClassLoadError(this.getInvalidClassError(name, targetClassNode, packageOwnedByConfig));
@@ -560,17 +566,30 @@ class MixinProcessor {
                 }
 
                 try {
-                    // Tree for target class
-                    Section timer = this.profiler.begin("read");
-                    TargetClassContext context = new TargetClassContext(environment, this.extensions, this.sessionId,
-                            name, targetClassNode, mixins);
-                    timer.end();
-                    this.applyMixins(context);
+                    TargetClassContext context = new TargetClassContext(environment, this.extensions, this.sessionId, name, targetClassNode, mixins);
+                    context.applyMixins();
+                    
+                    transformed |= this.coprocessors.postProcess(name, targetClassNode);
+
+                    if (context.isExported()) {
+                        this.extensions.export(environment, context.getClassName(), context.isExportForced(), context.getClassNode());
+                    }
+                    
+                    for (InvalidMixinException suppressed : context.getSuppressedExceptions()) {
+                        this.handleMixinApplyError(context.getClassName(), suppressed, environment);
+                    }
+
                     this.transformedCount++;
-                    success = true;
+                    transformed = true;
                 } catch (InvalidMixinException th) {
                     this.dumpClassOnFailure(name, targetClassNode, environment);
                     this.handleMixinApplyError(name, th, environment);
+                }
+            } else {
+                // No mixins, but still need to run postProcess stage of coprocessors
+                if (this.coprocessors.postProcess(name, targetClassNode)) {
+                    transformed = true;
+                    this.extensions.export(environment, name, false, targetClassNode);
                 }
             }
         } catch (MixinTransformerError er) {
@@ -582,7 +601,7 @@ class MixinProcessor {
             this.lock.pop();
             mixinTimer.end();
         }
-        return success;
+        return transformed;
     }
 
     private String getInvalidClassError(String name, ClassNode targetClassNode, ConfigWrapper ownedByConfig) {
@@ -648,8 +667,8 @@ class MixinProcessor {
                     totalMixins, elapsed, perMixinTime, loadTime, transformTime, pluginTime);
         }
 
-        this.profiler.mark("apply");
-        this.profiler.setActive(environment.getOption(Option.DEBUG_PROFILER));
+        this.profiler.mark(environment.getPhase().toString() + ":apply");
+        Profiler.setActive(environment.getOption(Option.DEBUG_PROFILER));
     }
 
     /**
@@ -677,7 +696,9 @@ class MixinProcessor {
         
         final IHotSwap hotSwapper = this.hotSwapper;
         for (ConfigWrapper config : this.pendingConfigs) {
-            config.getConfig().addListener(this.postProcessor);
+            for (MixinCoprocessor coprocessor : this.coprocessors) {
+                config.addListener(coprocessor);
+            }
             if (hotSwapper != null) {
                 config.getConfig().addListener(new IMixinConfig.IListener() {
                     @Override
@@ -693,9 +714,9 @@ class MixinProcessor {
         
         for (ConfigWrapper config : this.pendingConfigs) {
             try {
-                MixinProcessor.logger.log(this.verboseLoggingLevel, "Preparing {} ({})", config, config.getConfig().getClasses().size());
-                config.prepare();
-                totalMixins += config.mixins.size();
+                MixinProcessor.logger.log(this.verboseLoggingLevel, "Preparing {} ({})", config, config.getDeclaredMixinCount());
+                config.prepare(extensions);
+                totalMixins += config.getMixinCount();
             } catch (InvalidMixinException ex) {
                 this.handleMixinPrepareError(config, ex, environment);
             } catch (Exception ex) {
@@ -722,7 +743,7 @@ class MixinProcessor {
 
         for (ConfigWrapper config : this.pendingConfigs) {
             try {
-                config.postInitialise();
+                config.postInitialise(this.extensions);
             } catch (InvalidMixinException ex) {
                 this.handleMixinPrepareError(config, ex, environment);
             } catch (Exception ex) {
@@ -736,38 +757,6 @@ class MixinProcessor {
         this.pendingConfigs.clear();
         
         return totalMixins;
-    }
-
-    /**
-     * Apply mixins for specified target class to the class described by the
-     * supplied byte array.
-     * 
-     * @param environment current environment
-     * @param context target class context
-     */
-    private void applyMixins(TargetClassContext context) {
-        Section timer = this.profiler.begin("preapply");
-        this.extensions.preApply(context);
-        timer = timer.next("apply");
-        context.applyMixins();
-        timer = timer.next("postapply");
-        unhandledTargets.remove(context.getClassName());
-        boolean export = false;
-        try {
-            this.extensions.postApply(context);
-            export = true;
-        } catch (ValidationFailedException ex) {
-            MixinProcessor.logger.info(ex.getMessage());
-            // If verify is enabled and failed, write out the bytecode to allow us to inspect it
-            export |= context.isExportForced() || environment.getOption(Option.DEBUG_EXPORT);
-        }
-        timer.end();
-        if (export) {
-            this.extensions.export(this.environment, context.getClassName(), context.isExportForced(), context.getClassNode());
-        }
-        for (InvalidMixinException suppressed : context.getSuppressedExceptions()) {
-            this.handleMixinApplyError(context.getClassName(), suppressed, environment);
-        }
     }
 
     private void handleMixinPrepareError(ConfigWrapper config, InvalidMixinException ex, MixinEnvironment environment) throws MixinPrepareError {
@@ -832,7 +821,7 @@ class MixinProcessor {
             try {
                 MixinProcessor.logger.info("Instancing error handler class {}", handlerClassName);
                 Class<?> handlerClass = this.service.getClassProvider().findClass(handlerClassName, true);
-                IMixinErrorHandler handler = (IMixinErrorHandler)handlerClass.getConstructor().newInstance();
+                IMixinErrorHandler handler = (IMixinErrorHandler)handlerClass.getDeclaredConstructor().newInstance();
                 if (handler != null) {
                     handlers.add(handler);
                 }

@@ -124,5 +124,24 @@ public interface IMixinService {
      * @return minimum supported {@link CompatibilityLevel} or null
      */
     public abstract CompatibilityLevel getMaxCompatibilityLevel();
+    
+    /**
+     * Retrieve a logger adapter with the specified name (id). In general this
+     * method will be called many times for a given name so it is anticipated
+     * that the returned logger instances are cached by the service.
+     * 
+     * <p>There is no contractual requirement however that adapters are cached
+     * and that the same adapter is returned for every call to this method with
+     * the same name.</p>
+     * 
+     * <p>This methood <em>must not return <tt>null</tt></em>.</p>
+     * 
+     * <p>Implementations should be thread-safe since loggers may be requested
+     * by threads other than the main application thread.</p>
+     * 
+     * @param name Logger name
+     * @return Logger adapter for the underlying logging subsystem
+     */
+    public abstract ILogger getLogger(final String name);
 
 }

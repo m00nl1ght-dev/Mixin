@@ -44,7 +44,7 @@ public class MixinClassGenerator {
     /**
      * Log things for stuff
      */
-    static final Logger logger = LogManager.getLogger("mixin");
+    static final ILogger logger = MixinService.getService().getLogger("mixin");
 
     /**
      * Transformer extensions
@@ -61,6 +61,7 @@ public class MixinClassGenerator {
      */
     MixinClassGenerator(MixinEnvironment environment, Extensions extensions) {
         this.extensions = extensions;
+        this.profiler = Profiler.getProfiler("generator");
         this.auditTrail = MixinService.getService().getAuditTrail();
     }
 

@@ -1,7 +1,7 @@
 
 buildscript {
     repositories {
-        jcenter()
+        gradlePluginPortal()
     }
     dependencies {
         classpath 'nl.javadude.gradle.plugins:license-gradle-plugin:0.11.0'
@@ -36,6 +36,9 @@ sourceSets {
     universalTestExample {
         compileClasspath += universalTest.output
         compileClasspath += main.output
+        ext.languageVersion = 8
+        ext.compatibility = '1.6'
+        ext.modularityExcluded = true
     }
 }
 
@@ -91,9 +94,40 @@ tasks.withType(JavaCompile) {
     options.encoding = 'utf8'
 }
 
+def modularityInputs = objects.fileCollection()
+
+project.sourceSets.each { set -> {
+    if (set.ext.has("languageVersion")) {
+        project.tasks[set.compileJavaTaskName].javaCompiler = javaToolchains.compilerFor {
+            languageVersion = JavaLanguageVersion.of(set.ext.languageVersion)
+        }
+    } 
+    if (set.ext.has("compatibility")) {
+        project.tasks[set.compileJavaTaskName].sourceCompatibility = set.ext.compatibility
+        project.tasks[set.compileJavaTaskName].targetCompatibility = set.ext.compatibility
+    }
+    def modularityExcluded = set.ext.has("modularityExcluded") && set.ext.modularityExcluded
+    if (!modularityExcluded) {
+        project.sourceSets.modularity {
+            compileClasspath += set.output
+        }
+        modularityInputs.from set.output
+    }
+}}
+
+compileModularityJava {
+    inputs.files(modularityInputs)
+    doFirst {
+        options.compilerArgs = [
+            '--module-path', classpath.asPath,
+            '--patch-module', "org.spongepowered.mixin=${modularityInputs.collect { it.absolutePath }.join(File.pathSeparator)}"
+        ]
+    }
+}
+
 if (JavaVersion.current().isJava8Compatible()) {
     tasks.withType(Javadoc) {
         // disable the crazy super-strict doclint tool in Java 8
-        options.addStringOption('Xdoclint:none', '-quiet')
+        options.addStringOption('Xdoclint:syntax', '-quiet')
     }
 }

@@ -36,8 +36,10 @@ import org.spongepowered.asm.mixin.MixinEnvironment.Option;
 import org.spongepowered.asm.mixin.transformer.ext.IDecompiler;
 import org.spongepowered.asm.mixin.transformer.ext.IExtension;
 import org.spongepowered.asm.mixin.transformer.ext.ITargetClassContext;
+import org.spongepowered.asm.service.MixinService;
 import org.spongepowered.asm.transformers.MixinClassWriter;
 import org.spongepowered.asm.util.Constants;
+import org.spongepowered.asm.util.perf.Profiler;
 import org.spongepowered.asm.util.perf.Profiler.Section;
 
 import java.io.File;
@@ -59,7 +61,7 @@ public class ExtensionClassExporter implements IExtension {
     /**
      * Logger
      */
-    private static final Logger logger = LogManager.getLogger("mixin");
+    private static final ILogger logger = MixinService.getService().getLogger("mixin");
 
     /**
      * Directory to export classes to when debug.export is enabled
@@ -139,7 +141,7 @@ public class ExtensionClassExporter implements IExtension {
         if (force || env.getOption(Option.DEBUG_EXPORT)) {
             String filter = env.getOptionValue(Option.DEBUG_EXPORT_FILTER);
             if (force || filter == null || this.applyFilter(filter, name)) {
-                Section exportTimer = env.getProfiler().begin("debug.export");
+                Section exportTimer = Profiler.getProfiler("export").begin("debug.export");
                 
                 File outputFile = this.dumpClass(name.replace('.', '/'), classNode);
                 if (this.decompiler != null) {
