@@ -24,15 +24,11 @@
  */
 package org.spongepowered.asm.mixin.injection.callback;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
+import com.google.common.base.Strings;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
+import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.InjectionPoint;
@@ -44,14 +40,9 @@ import org.spongepowered.asm.mixin.injection.struct.Target;
 import org.spongepowered.asm.mixin.injection.struct.Target.Extension;
 import org.spongepowered.asm.mixin.injection.throwables.InjectionError;
 import org.spongepowered.asm.mixin.injection.throwables.InvalidInjectionException;
-import org.spongepowered.asm.util.Annotations;
-import org.spongepowered.asm.util.Bytecode;
-import org.spongepowered.asm.util.Constants;
-import org.spongepowered.asm.util.Locals;
-import org.spongepowered.asm.util.PrettyPrinter;
-import org.spongepowered.asm.util.SignaturePrinter;
+import org.spongepowered.asm.util.*;
 
-import com.google.common.base.Strings;
+import java.util.*;
 
 /**
  * This class is responsible for generating the bytecode for injected callbacks,
@@ -300,7 +291,7 @@ public class CallbackInjector extends Injector {
                     return false; // No @Coerce specified, types must match
                 }
 
-                if (!Injector.canCoerce(inTypes[arg], myTypes[arg])) {
+                if (!canCoerce(inTypes[arg], myTypes[arg])) {
 //                    if (Injector.canCoerce(myTypes[arg], inTypes[arg])) {
 //                        this.typeCasts[arg] = inTypes[arg];
 //                    } else {
@@ -426,7 +417,7 @@ public class CallbackInjector extends Injector {
     @Override
     protected void preInject(Target target, InjectionNode node) {
         if (this.localCapture.isCaptureLocals() || this.localCapture.isPrintLocals()) {
-            LocalVariableNode[] locals = Locals.getLocalsAt(this.classNode, target.method, node.getCurrentTarget());
+            LocalVariableNode[] locals = Locals.getLocalsAt(target.getEnvironment(), this.classNode, target.method, node.getCurrentTarget());
             for (int j = 0; j < locals.length; j++) {
                 if (locals[j] != null && locals[j].desc != null && locals[j].desc.startsWith("Lorg/spongepowered/asm/mixin/injection/callback/")) {
                     locals[j] = null;

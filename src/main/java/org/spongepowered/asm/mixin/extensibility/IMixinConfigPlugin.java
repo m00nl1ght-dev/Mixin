@@ -24,10 +24,10 @@
  */
 package org.spongepowered.asm.mixin.extensibility;
 
+import org.objectweb.asm.tree.ClassNode;
+
 import java.util.List;
 import java.util.Set;
-
-import org.objectweb.asm.tree.ClassNode;
 
 /**
  * <p>A companion plugin for a mixin configuration object. Objects implementing
@@ -52,16 +52,6 @@ public interface IMixinConfigPlugin {
      * @param mixinPackage The mixin root package from the config
      */
     public abstract void onLoad(String mixinPackage);
-
-    /**
-     * Called only if the "referenceMap" key in the config is <b>not</b> set.
-     * This allows the refmap file name to be supplied by the plugin
-     * programatically if desired. Returning <code>null</code> will revert to
-     * the default behaviour of using the default refmap json file.
-     * 
-     * @return Path to the refmap resource or null to revert to the default
-     */
-    public abstract String getRefMapperConfig();
     
     /**
      * Called during mixin intialisation, allows this plugin to control whether

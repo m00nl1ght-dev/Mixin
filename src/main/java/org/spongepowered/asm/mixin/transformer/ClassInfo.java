@@ -24,31 +24,14 @@
  */
 package org.spongepowered.asm.mixin.transformer;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.FieldInsnNode;
-import org.objectweb.asm.tree.FieldNode;
-import org.objectweb.asm.tree.FrameNode;
-import org.objectweb.asm.tree.MethodInsnNode;
-import org.objectweb.asm.tree.MethodNode;
-import org.spongepowered.asm.mixin.Final;
-import org.spongepowered.asm.mixin.MixinEnvironment;
-import org.spongepowered.asm.mixin.Mutable;
-import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.Unique;
+import org.objectweb.asm.tree.*;
+import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
@@ -62,8 +45,7 @@ import org.spongepowered.asm.util.Locals;
 import org.spongepowered.asm.util.perf.Profiler;
 import org.spongepowered.asm.util.perf.Profiler.Section;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
+import java.util.*;
 
 /**
  * Information about a class, used as a way of keeping track of class hierarchy
@@ -657,23 +639,24 @@ public final class ClassInfo {
         }
     }
 
+    public static class Cache {
+
+        private final Map<String, ClassInfo> classes = new HashMap<String, ClassInfo>();
+
+        private final ClassInfo object;
+
+        public Cache(MixinEnvironment environment) {
+            object = new ClassInfo(environment);
+            classes.put(ClassInfo.JAVA_LANG_OBJECT, object);
+        }
+
+    }
+
     private static final Logger logger = LogManager.getLogger("mixin");
-    
-    private static final Profiler profiler = MixinEnvironment.getProfiler();
 
     private static final String JAVA_LANG_OBJECT = "java/lang/Object";
 
-    /**
-     * Loading and parsing classes is expensive, so keep a cache of all the
-     * information we generate
-     */
-    private static final Map<String, ClassInfo> cache = new HashMap<String, ClassInfo>();
-
-    private static final ClassInfo OBJECT = new ClassInfo();
-
-    static {
-        ClassInfo.cache.put(ClassInfo.JAVA_LANG_OBJECT, ClassInfo.OBJECT);
-    }
+    private final MixinEnvironment environment;
 
     /**
      * Class name (binary name)
@@ -772,7 +755,8 @@ public final class ClassInfo {
     /**
      * Private constructor used to initialise the ClassInfo for {@link Object}
      */
-    private ClassInfo() {
+    private ClassInfo(MixinEnvironment environment) {
+        this.environment = environment;
         this.name = ClassInfo.JAVA_LANG_OBJECT;
         this.superName = null;
         this.outerName = null;
@@ -808,9 +792,10 @@ public final class ClassInfo {
      *
      * @param classNode Class node to inspect
      */
-    private ClassInfo(ClassNode classNode) {
-        Section timer = ClassInfo.profiler.begin(Profiler.ROOT, "class.meta");
+    private ClassInfo(MixinEnvironment environment, ClassNode classNode) {
+        Section timer = environment.getProfiler().begin(Profiler.ROOT, "class.meta");
         try {
+            this.environment = environment;
             this.name = classNode.name;
             this.superName = classNode.superName != null ? classNode.superName : ClassInfo.JAVA_LANG_OBJECT;
             this.initialisers = new HashSet<Method>();
@@ -849,7 +834,7 @@ public final class ClassInfo {
 
             this.isProbablyStatic = isProbablyStatic;
             this.outerName = outerName;
-            this.methodMapper = new MethodMapper(MixinEnvironment.getCurrentEnvironment(), this);
+            this.methodMapper = new MethodMapper(this);
             this.signature = ClassSignature.ofLazy(classNode);
         } finally {
             timer.end();
@@ -1025,7 +1010,7 @@ public final class ClassInfo {
      */
     public ClassInfo getSuperClass() {
         if (this.superClass == null && this.superName != null) {
-            this.superClass = ClassInfo.forName(this.superName);
+            this.superClass = ClassInfo.forName(environment, this.superName);
         }
 
         return this.superClass;
@@ -1044,7 +1029,7 @@ public final class ClassInfo {
      */
     public ClassInfo getOuterClass() {
         if (this.outerClass == null && this.outerName != null) {
-            this.outerClass = ClassInfo.forName(this.outerName);
+            this.outerClass = ClassInfo.forName(environment, this.outerName);
         }
 
         return this.outerClass;
@@ -1097,7 +1082,7 @@ public final class ClassInfo {
 
         ClassInfo supClass = this.addMethodsRecursive(methods, includeMixins);
         if (!this.isInterface) {
-            while (supClass != null && supClass != ClassInfo.OBJECT) {
+            while (supClass != null && supClass != object(environment)) {
                 supClass = supClass.addMethodsRecursive(methods, includeMixins);
             }
         }
@@ -1138,7 +1123,7 @@ public final class ClassInfo {
         }
 
         for (String iface : this.interfaces) {
-            ClassInfo.forName(iface).addMethodsRecursive(methods, includeMixins);
+            ClassInfo.forName(environment, iface).addMethodsRecursive(methods, includeMixins);
         }
 
         return this.getSuperClass();
@@ -1258,7 +1243,7 @@ public final class ClassInfo {
      *      anywhere
      */
     public boolean hasSuperClass(ClassInfo superClass, Traversal traversal, boolean includeInterfaces) {
-        if (ClassInfo.OBJECT == superClass) {
+        if (object(environment) == superClass) {
             return true;
         }
         
@@ -1298,7 +1283,7 @@ public final class ClassInfo {
      * @return Matched superclass or null if not found
      */
     public ClassInfo findSuperClass(String superClass, Traversal traversal, boolean includeInterfaces) {
-        if (ClassInfo.OBJECT.name.equals(superClass)) {
+        if (object(environment).name.equals(superClass)) {
             return null;
         }
         
@@ -1350,7 +1335,7 @@ public final class ClassInfo {
 
     private ClassInfo findInterface(String superClass) {
         for (String ifaceName : this.getInterfaces()) {
-            ClassInfo iface = ClassInfo.forName(ifaceName);
+            ClassInfo iface = ClassInfo.forName(environment, ifaceName);
             if (superClass.equals(ifaceName)) {
                 return iface;
             }
@@ -1392,7 +1377,7 @@ public final class ClassInfo {
     private ClassInfo findSuperTypeForMixin(ClassInfo mixin) {
         ClassInfo superClass = this;
 
-        while (superClass != null && superClass != ClassInfo.OBJECT) {
+        while (superClass != null && superClass != object(environment)) {
             for (MixinInfo minion : superClass.mixins) {
                 if (minion.getClassInfo().equals(mixin)) {
                     return superClass;
@@ -1419,7 +1404,7 @@ public final class ClassInfo {
 
         ClassInfo supClass = this.getSuperClass();
 
-        while (supClass != null && supClass != ClassInfo.OBJECT) {
+        while (supClass != null && supClass != object(environment)) {
             if (supClass.isMixin) {
                 return true;
             }
@@ -1444,7 +1429,7 @@ public final class ClassInfo {
 
         ClassInfo supClass = this.getSuperClass();
 
-        while (supClass != null && supClass != ClassInfo.OBJECT) {
+        while (supClass != null && supClass != object(environment)) {
             if (supClass.mixins.size() > 0) {
                 return true;
             }
@@ -1690,9 +1675,9 @@ public final class ClassInfo {
             }
         }
         
-        if (type == Type.METHOD && (this.isInterface || MixinEnvironment.getCompatibilityLevel().supports(LanguageFeatures.METHODS_IN_INTERFACES))) {
+        if (type == Type.METHOD && (this.isInterface || environment.getCompatibilityLevel().supports(LanguageFeatures.METHODS_IN_INTERFACES))) {
             for (String implemented : this.interfaces) {
-                ClassInfo iface = ClassInfo.forName(implemented);
+                ClassInfo iface = ClassInfo.forName(environment, implemented);
                 if (iface == null) {
                     ClassInfo.logger.debug("Failed to resolve declared interface {} on {}", implemented, this.name);
                     continue;
@@ -1871,11 +1856,11 @@ public final class ClassInfo {
      * @param classNode classNode to get info for
      * @return ClassInfo instance for the supplied classNode
      */
-    static ClassInfo fromClassNode(ClassNode classNode) {
-        ClassInfo info = ClassInfo.cache.get(classNode.name);
+    static ClassInfo fromClassNode(MixinEnvironment environment, ClassNode classNode) {
+        ClassInfo info = fromCache(environment, classNode.name);
         if (info == null) {
-            info = new ClassInfo(classNode);
-            ClassInfo.cache.put(classNode.name, info);
+            info = new ClassInfo(environment, classNode);
+            environment.getClassInfoCache().classes.put(classNode.name, info);
         }
 
         return info;
@@ -1889,14 +1874,14 @@ public final class ClassInfo {
      * @return ClassInfo for the specified class name or null if the specified
      *      name cannot be resolved for some reason
      */
-    public static ClassInfo forName(String className) {
+    public static ClassInfo forName(MixinEnvironment environment, String className) {
         className = className.replace('.', '/');
 
-        ClassInfo info = ClassInfo.cache.get(className);
+        ClassInfo info = environment.getClassInfoCache().classes.get(className);
         if (info == null) {
             try {
                 ClassNode classNode = MixinService.getService().getBytecodeProvider().getClassNode(className);
-                info = new ClassInfo(classNode);
+                info = new ClassInfo(environment, classNode);
             } catch (Exception ex) {
                 ClassInfo.logger.catching(Level.TRACE, ex);
                 ClassInfo.logger.warn("Error loading class: {} ({}: {})", className, ex.getClass().getName(), ex.getMessage());
@@ -1904,7 +1889,7 @@ public final class ClassInfo {
             }
 
             // Put null in the cache if load failed
-            ClassInfo.cache.put(className, info);
+            environment.getClassInfoCache().classes.put(className, info);
             ClassInfo.logger.trace("Added class metadata for {} to metadata cache", className);
         }
 
@@ -1920,7 +1905,7 @@ public final class ClassInfo {
      * @return ClassInfo for the specified class name or null if the specified
      *      name cannot be resolved for some reason
      */
-    public static ClassInfo forDescriptor(String descriptor, TypeLookup lookup) {
+    public static ClassInfo forDescriptor(MixinEnvironment environment, String descriptor, TypeLookup lookup) {
         org.objectweb.asm.Type type; 
         try {
             type = org.objectweb.asm.Type.getObjectType(descriptor);
@@ -1928,7 +1913,7 @@ public final class ClassInfo {
             ClassInfo.logger.warn("Error resolving type from descriptor: {}", descriptor);
             return null;
         }
-        return ClassInfo.forType(type, lookup);
+        return ClassInfo.forType(environment, type, lookup);
     }
     
     /**
@@ -1940,16 +1925,16 @@ public final class ClassInfo {
      * @return ClassInfo for the supplied type or null if the supplied type
      *      cannot be found or is a primitive type
      */
-    public static ClassInfo forType(org.objectweb.asm.Type type, TypeLookup lookup) {
+    public static ClassInfo forType(MixinEnvironment environment, org.objectweb.asm.Type type, TypeLookup lookup) {
         if (type.getSort() == org.objectweb.asm.Type.ARRAY) {
             if (lookup == TypeLookup.ELEMENT_TYPE) {
-                return ClassInfo.forType(type.getElementType(), TypeLookup.ELEMENT_TYPE);
+                return ClassInfo.forType(environment, type.getElementType(), TypeLookup.ELEMENT_TYPE);
             }
-            return ClassInfo.OBJECT;
+            return object(environment);
         } else if (type.getSort() < org.objectweb.asm.Type.ARRAY) {
             return null;
         }
-        return ClassInfo.forName(type.getClassName().replace('.', '/'));
+        return ClassInfo.forName(environment, type.getClassName().replace('.', '/'));
     }
 
     /**
@@ -1963,8 +1948,8 @@ public final class ClassInfo {
      * @return ClassInfo for the specified class name or null if the specified
      *      class does not have an entry in the cache
      */
-    public static ClassInfo fromCache(String className) {
-        return ClassInfo.cache.get(className.replace('.', '/'));
+    public static ClassInfo fromCache(MixinEnvironment environment, String className) {
+        return environment.getClassInfoCache().classes.get(className.replace('.', '/'));
     }
 
     /**
@@ -1979,16 +1964,16 @@ public final class ClassInfo {
      * @return ClassInfo for the supplied type or null if the supplied type
      *      does not have an entry in the cache
      */
-    public static ClassInfo fromCache(org.objectweb.asm.Type type, TypeLookup lookup) {
+    public static ClassInfo fromCache(MixinEnvironment environment, org.objectweb.asm.Type type, TypeLookup lookup) {
         if (type.getSort() == org.objectweb.asm.Type.ARRAY) {
             if (lookup == TypeLookup.ELEMENT_TYPE) {
-                return ClassInfo.fromCache(type.getElementType(), TypeLookup.ELEMENT_TYPE);
+                return ClassInfo.fromCache(environment, type.getElementType(), TypeLookup.ELEMENT_TYPE);
             }
-            return ClassInfo.OBJECT;
+            return object(environment);
         } else if (type.getSort() < org.objectweb.asm.Type.ARRAY) {
             return null;
         }
-        return ClassInfo.fromCache(type.getClassName());
+        return ClassInfo.fromCache(environment, type.getClassName());
     }
 
     /**
@@ -1999,11 +1984,11 @@ public final class ClassInfo {
      * @param type2 Second type
      * @return common superclass info
      */
-    public static ClassInfo getCommonSuperClass(String type1, String type2) {
+    public static ClassInfo getCommonSuperClass(MixinEnvironment environment, String type1, String type2) {
         if (type1 == null || type2 == null) {
-            return ClassInfo.OBJECT;
+            return object(environment);
         }
-        return ClassInfo.getCommonSuperClass(ClassInfo.forName(type1), ClassInfo.forName(type2));
+        return ClassInfo.getCommonSuperClass(ClassInfo.forName(environment, type1), ClassInfo.forName(environment, type2));
     }
     
     /**
@@ -2014,12 +1999,12 @@ public final class ClassInfo {
      * @param type2 Second type
      * @return common superclass info
      */
-    public static ClassInfo getCommonSuperClass(org.objectweb.asm.Type type1, org.objectweb.asm.Type type2) {
+    public static ClassInfo getCommonSuperClass(MixinEnvironment environment, org.objectweb.asm.Type type1, org.objectweb.asm.Type type2) {
         if (type1 == null || type2 == null
                 || type1.getSort() != org.objectweb.asm.Type.OBJECT || type2.getSort() != org.objectweb.asm.Type.OBJECT) {
-            return ClassInfo.OBJECT;
+            return object(environment);
         }
-        return ClassInfo.getCommonSuperClass(ClassInfo.forType(type1, TypeLookup.DECLARED_TYPE), ClassInfo.forType(type2, TypeLookup.DECLARED_TYPE));
+        return ClassInfo.getCommonSuperClass(ClassInfo.forType(environment, type1, TypeLookup.DECLARED_TYPE), ClassInfo.forType(environment, type2, TypeLookup.DECLARED_TYPE));
     }
 
     /**
@@ -2042,11 +2027,11 @@ public final class ClassInfo {
      * @param type2 Second type
      * @return common superclass info
      */
-    public static ClassInfo getCommonSuperClassOrInterface(String type1, String type2) {
+    public static ClassInfo getCommonSuperClassOrInterface(MixinEnvironment environment, String type1, String type2) {
         if (type1 == null || type2 == null) {
-            return ClassInfo.OBJECT;
+            return object(environment);
         }
-        return ClassInfo.getCommonSuperClassOrInterface(ClassInfo.forName(type1), ClassInfo.forName(type2));
+        return ClassInfo.getCommonSuperClassOrInterface(ClassInfo.forName(environment, type1), ClassInfo.forName(environment, type2));
     }
     
     /**
@@ -2057,13 +2042,13 @@ public final class ClassInfo {
      * @param type2 Second type
      * @return common superclass info
      */
-    public static ClassInfo getCommonSuperClassOrInterface(org.objectweb.asm.Type type1, org.objectweb.asm.Type type2) {
+    public static ClassInfo getCommonSuperClassOrInterface(MixinEnvironment environment, org.objectweb.asm.Type type1, org.objectweb.asm.Type type2) {
         if (type1 == null || type2 == null
                 || type1.getSort() != org.objectweb.asm.Type.OBJECT || type2.getSort() != org.objectweb.asm.Type.OBJECT) {
-            return ClassInfo.OBJECT;
+            return object(environment);
         }
-        return ClassInfo.getCommonSuperClassOrInterface(ClassInfo.forType(type1, TypeLookup.DECLARED_TYPE),
-                ClassInfo.forType(type2, TypeLookup.DECLARED_TYPE));
+        return ClassInfo.getCommonSuperClassOrInterface(ClassInfo.forType(environment, type1, TypeLookup.DECLARED_TYPE),
+                ClassInfo.forType(environment, type2, TypeLookup.DECLARED_TYPE));
     }
 
     /**
@@ -2084,17 +2069,21 @@ public final class ClassInfo {
         } else if (type2.hasSuperClass(type1, Traversal.NONE, includeInterfaces)) {
             return type1;
         } else if (type1.isInterface() || type2.isInterface()) {
-            return ClassInfo.OBJECT;
+            return object(type1.environment);
         }
         
         do {
             type1 = type1.getSuperClass();
             if (type1 == null) {
-                return ClassInfo.OBJECT;
+                return object(type1.environment);
             }
         } while (!type2.hasSuperClass(type1, Traversal.NONE, includeInterfaces));
         
         return type1;
+    }
+
+    private static ClassInfo object(MixinEnvironment environment) {
+        return environment.getClassInfoCache().object;
     }
 
 }

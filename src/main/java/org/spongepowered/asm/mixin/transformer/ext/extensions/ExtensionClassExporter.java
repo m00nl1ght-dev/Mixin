@@ -24,11 +24,9 @@
  */
 package org.spongepowered.asm.mixin.transformer.ext.extensions;
 
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.util.regex.Pattern;
-
+import com.google.common.io.Files;
+import com.google.common.io.MoreFiles;
+import com.google.common.io.RecursiveDeleteOption;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.objectweb.asm.ClassWriter;
@@ -42,9 +40,11 @@ import org.spongepowered.asm.transformers.MixinClassWriter;
 import org.spongepowered.asm.util.Constants;
 import org.spongepowered.asm.util.perf.Profiler.Section;
 
-import com.google.common.io.Files;
-import com.google.common.io.MoreFiles;
-import com.google.common.io.RecursiveDeleteOption;
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.util.Objects;
+import java.util.regex.Pattern;
 
 /**
  * Debug exporter
@@ -70,9 +70,12 @@ public class ExtensionClassExporter implements IExtension {
      * Runtime decompiler for exported classes 
      */
     private final IDecompiler decompiler;
+
+    private final MixinEnvironment environment;
     
-    public ExtensionClassExporter(MixinEnvironment env) {
-        this.decompiler = this.initDecompiler(env, new File(Constants.DEBUG_OUTPUT_DIR, ExtensionClassExporter.EXPORT_JAVA_DIR));
+    public ExtensionClassExporter(MixinEnvironment environment) {
+        this.environment = Objects.requireNonNull(environment);
+        this.decompiler = this.initDecompiler(environment, new File(Constants.DEBUG_OUTPUT_DIR, ExtensionClassExporter.EXPORT_JAVA_DIR));
 
         try {
             MoreFiles.deleteRecursively(this.classExportDir.toPath(), RecursiveDeleteOption.ALLOW_INSECURE);
@@ -136,7 +139,7 @@ public class ExtensionClassExporter implements IExtension {
         if (force || env.getOption(Option.DEBUG_EXPORT)) {
             String filter = env.getOptionValue(Option.DEBUG_EXPORT_FILTER);
             if (force || filter == null || this.applyFilter(filter, name)) {
-                Section exportTimer = MixinEnvironment.getProfiler().begin("debug.export");
+                Section exportTimer = env.getProfiler().begin("debug.export");
                 
                 File outputFile = this.dumpClass(name.replace('.', '/'), classNode);
                 if (this.decompiler != null) {
@@ -158,7 +161,7 @@ public class ExtensionClassExporter implements IExtension {
         File outputFile = new File(this.classExportDir, fileName + ".class");
         outputFile.getParentFile().mkdirs();
         try {
-            byte[] bytecode = ExtensionClassExporter.getClassBytes(classNode, true);
+            byte[] bytecode = getClassBytes(classNode, true);
             if (bytecode != null) {
                 Files.write(bytecode, outputFile);
             }
@@ -168,10 +171,10 @@ public class ExtensionClassExporter implements IExtension {
         return outputFile;
     }
 
-    private static byte[] getClassBytes(ClassNode classNode, boolean computeFrames) {
+    private byte[] getClassBytes(ClassNode classNode, boolean computeFrames) {
         byte[] bytes = null;
         try {
-            MixinClassWriter cw = new MixinClassWriter(computeFrames ? ClassWriter.COMPUTE_FRAMES : 0);
+            MixinClassWriter cw = new MixinClassWriter(computeFrames ? ClassWriter.COMPUTE_FRAMES : 0, environment);
             classNode.accept(cw);
             bytes = cw.toByteArray();
         } catch (NegativeArraySizeException ex) {
@@ -181,7 +184,7 @@ public class ExtensionClassExporter implements IExtension {
             // the bytecode to inspect!
             if (computeFrames) {
                 ExtensionClassExporter.logger.warn("Exporting class {} with COMPUTE_FRAMES failed! Trying a raw export.", classNode.name);
-                return ExtensionClassExporter.getClassBytes(classNode, false);
+                return getClassBytes(classNode, false);
             }
             ex.printStackTrace();
         } catch (Exception ex) {

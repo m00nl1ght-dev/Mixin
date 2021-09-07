@@ -24,14 +24,9 @@
  */
 package org.spongepowered.asm.mixin.transformer;
 
-import java.lang.reflect.Constructor;
-import java.util.List;
-
 import org.objectweb.asm.tree.ClassNode;
-import org.spongepowered.asm.launch.MixinInitialisationError;
 import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.MixinEnvironment.Option;
-import org.spongepowered.asm.mixin.throwables.MixinException;
 import org.spongepowered.asm.mixin.transformer.ext.Extensions;
 import org.spongepowered.asm.mixin.transformer.ext.IExtensionRegistry;
 import org.spongepowered.asm.mixin.transformer.ext.IHotSwap;
@@ -39,29 +34,16 @@ import org.spongepowered.asm.transformers.TreeTransformer;
 import org.spongepowered.asm.util.Constants;
 import org.spongepowered.asm.util.asm.ASM;
 
+import java.lang.reflect.Constructor;
+import java.util.List;
+
 /**
  * Transformer which manages the mixin configuration and application process
  */
 public final class MixinTransformer extends TreeTransformer implements IMixinTransformer {
-    
-    /**
-     * Impl of mixin transformer factory
-     */
-    static class Factory implements IMixinTransformerFactory {
-        
-        /* (non-Javadoc)
-         * @see org.spongepowered.asm.mixin.transformer.IMixinTransformerFactory
-         *      #createTransformer()
-         */
-        @Override
-        public IMixinTransformer createTransformer() throws MixinInitialisationError {
-            return new MixinTransformer();
-        }
-        
-    }
-    
+
     private static final String MIXIN_AGENT_CLASS = "org.spongepowered.tools.agent.MixinAgent";
-    
+
     /**
      * Synthetic class registry
      */
@@ -87,17 +69,9 @@ public final class MixinTransformer extends TreeTransformer implements IMixinTra
      */
     private final MixinClassGenerator generator;
 
-    public MixinTransformer() {
-        MixinEnvironment environment = MixinEnvironment.getCurrentEnvironment();
-        
-        Object globalMixinTransformer = environment.getActiveTransformer();
-        if (globalMixinTransformer instanceof IMixinTransformer) {
-            throw new MixinException("Terminating MixinTransformer instance " + this);
-        }
-        
-        // I am a leaf on the wind
-        environment.setActiveTransformer(this);
-        
+    public MixinTransformer(MixinEnvironment environment) {
+        super(environment);
+
         this.syntheticClassRegistry = new SyntheticClassRegistry();
         this.extensions = new Extensions(this.syntheticClassRegistry);
         
@@ -185,8 +159,6 @@ public final class MixinTransformer extends TreeTransformer implements IMixinTra
         if (transformedName == null) {
             return basicClass;
         }
-        
-        MixinEnvironment environment = MixinEnvironment.getCurrentEnvironment();
 
         if (basicClass == null) {
             return this.generateClass(environment, transformedName);
@@ -224,7 +196,7 @@ public final class MixinTransformer extends TreeTransformer implements IMixinTra
     @Override
     public byte[] transformClass(MixinEnvironment environment, String name, byte[] classBytes) {
         ClassNode classNode = this.readClass(name, classBytes);
-        if (this.processor.applyMixins(environment, name, classNode)) {
+        if (this.processor.applyMixins(name, classNode)) {
             return this.writeClass(classNode);
         }
         return classBytes;
@@ -240,7 +212,7 @@ public final class MixinTransformer extends TreeTransformer implements IMixinTra
      */
     @Override
     public boolean transformClass(MixinEnvironment environment, String name, ClassNode classNode) {
-        return this.processor.applyMixins(environment, name, classNode);
+        return this.processor.applyMixins(name, classNode);
     }
     
     /**
@@ -252,7 +224,7 @@ public final class MixinTransformer extends TreeTransformer implements IMixinTra
      */
     @Override
     public byte[] generateClass(MixinEnvironment environment, String name) {
-        ClassNode classNode = MixinTransformer.createEmptyClass(name);
+        ClassNode classNode = createEmptyClass(name);
         if (this.generator.generateClass(environment, name, classNode)) {
             return this.writeClass(classNode);
         }
@@ -273,10 +245,10 @@ public final class MixinTransformer extends TreeTransformer implements IMixinTra
     /**
      * You need to ask yourself why you're reading this comment  
      */
-    private static ClassNode createEmptyClass(String name) {
+    private ClassNode createEmptyClass(String name) {
         ClassNode classNode = new ClassNode(ASM.API_VERSION);
         classNode.name = name.replace('.', '/');
-        classNode.version = MixinEnvironment.getCompatibilityLevel().getClassVersion();
+        classNode.version = environment.getCompatibilityLevel().getClassVersion();
         classNode.superName = Constants.OBJECT;
         return classNode;
     }

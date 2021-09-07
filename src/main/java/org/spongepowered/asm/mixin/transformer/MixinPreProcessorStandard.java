@@ -145,7 +145,7 @@ class MixinPreProcessorStandard {
     
     protected final MixinEnvironment env;
     
-    protected final Profiler profiler = MixinEnvironment.getProfiler();
+    protected final Profiler profiler;
     
     protected final ActivityStack activities = new ActivityStack();
 
@@ -155,8 +155,9 @@ class MixinPreProcessorStandard {
     
     MixinPreProcessorStandard(MixinInfo mixin, MixinClassNode classNode) {
         this.mixin = mixin;
+        this.profiler = mixin.getEnvironment().getProfiler();
         this.classNode = classNode;
-        this.env = mixin.getParent().getEnvironment();
+        this.env = mixin.getEnvironment();
         this.verboseLogging = this.env.getOption(Option.DEBUG_VERBOSE);
         this.strictUnique = this.env.getOption(Option.DEBUG_UNIQUE);
     }
@@ -370,7 +371,7 @@ class MixinPreProcessorStandard {
         
         String description = type + " method " + mixinMethod.name;
         Method method = this.getSpecialMethod(mixinMethod, type);
-        if (MixinEnvironment.getCompatibilityLevel().isAtLeast(CompatibilityLevel.JAVA_8) && method.isStatic()) {
+        if (mixin.getEnvironment().getCompatibilityLevel().isAtLeast(CompatibilityLevel.JAVA_8) && method.isStatic()) {
             if (this.mixin.getTargets().size() > 1) {
                 throw new InvalidAccessorException(context, description + " in multi-target mixin is invalid. Mixin must have exactly 1 target.");
             }
@@ -736,7 +737,7 @@ class MixinPreProcessorStandard {
     protected void transformMethod(MethodInsnNode methodNode) {
         Activity activity = this.activities.begin("%s::%s%s", methodNode.owner, methodNode.name, methodNode.desc);
         Section metaTimer = this.profiler.begin("meta");
-        ClassInfo owner = ClassInfo.forDescriptor(methodNode.owner, TypeLookup.DECLARED_TYPE);
+        ClassInfo owner = ClassInfo.forDescriptor(mixin.getEnvironment(), methodNode.owner, TypeLookup.DECLARED_TYPE);
         if (owner == null) {
             throw new ClassMetadataNotFoundException(methodNode.owner.replace('/', '.'));
         }
@@ -753,7 +754,7 @@ class MixinPreProcessorStandard {
     protected void transformField(FieldInsnNode fieldNode) {
         Activity activity = this.activities.begin("%s::%s:%s", fieldNode.owner, fieldNode.name, fieldNode.desc);
         Section metaTimer = this.profiler.begin("meta");
-        ClassInfo owner = ClassInfo.forDescriptor(fieldNode.owner, TypeLookup.DECLARED_TYPE);
+        ClassInfo owner = ClassInfo.forDescriptor(mixin.getEnvironment(), fieldNode.owner, TypeLookup.DECLARED_TYPE);
         if (owner == null) {
             throw new ClassMetadataNotFoundException(fieldNode.owner.replace('/', '.'));
         }

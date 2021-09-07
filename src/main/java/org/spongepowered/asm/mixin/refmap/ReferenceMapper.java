@@ -39,9 +39,6 @@ import org.spongepowered.asm.util.logging.MessageRouter;
 
 import com.google.common.collect.Maps;
 import com.google.common.io.Closeables;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.JsonParseException;
 
 /**
  * Stores runtime information allowing field, method and type references which
@@ -238,66 +235,6 @@ public final class ReferenceMapper implements IReferenceMapper, Serializable {
             mappings.put(className, classMappings);
         }
         return classMappings.put(conformedReference, newReference);
-    }
-    
-    /**
-     * Write this refmap out to the specified writer
-     * 
-     * @param writer Writer to write to
-     */
-    public void write(Appendable writer) {
-        new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(this, writer);
-    }
-    
-    /**
-     * Read a new refmap from the specified resource
-     * 
-     * @param resourcePath Resource to read from
-     * @return new refmap or {@link #DEFAULT_MAPPER} if reading fails
-     */
-    public static ReferenceMapper read(String resourcePath) {
-        Reader reader = null;
-        try {
-            IMixinService service = MixinService.getService();
-            InputStream resource = service.getResourceAsStream(resourcePath);
-            if (resource != null) {
-                reader = new InputStreamReader(resource);
-                ReferenceMapper mapper = ReferenceMapper.readJson(reader);
-                mapper.setResourceName(resourcePath);
-                return mapper;
-            }
-        } catch (JsonParseException ex) {
-            MessageRouter.getMessager().printMessage(Kind.ERROR, String.format("Invalid REFMAP JSON in %s: %s %s",
-                    resourcePath, ex.getClass().getName(), ex.getMessage()));
-        } catch (Exception ex) {
-            MessageRouter.getMessager().printMessage(Kind.ERROR, String.format("Failed reading REFMAP JSON from %s: %s %s",
-                    resourcePath, ex.getClass().getName(), ex.getMessage()));
-        } finally {
-            Closeables.closeQuietly(reader);
-        }
-        
-        return ReferenceMapper.DEFAULT_MAPPER;
-    }
-    
-    /**
-     * Read a new refmap instance from the specified reader 
-     * 
-     * @param reader Reader to read from
-     * @param name Name of the resource being read from
-     * @return new refmap
-     */
-    public static ReferenceMapper read(Reader reader, String name) {
-        try {
-            ReferenceMapper mapper = ReferenceMapper.readJson(reader);
-            mapper.setResourceName(name);
-            return mapper;
-        } catch (Exception ex) {
-            return ReferenceMapper.DEFAULT_MAPPER;
-        }
-    }
-
-    private static ReferenceMapper readJson(Reader reader) {
-        return new Gson().fromJson(reader, ReferenceMapper.class);
     }
     
 }

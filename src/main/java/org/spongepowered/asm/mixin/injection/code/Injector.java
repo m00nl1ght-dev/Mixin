@@ -39,6 +39,7 @@ import org.apache.logging.log4j.Logger;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
+import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.MixinEnvironment.Option;
 import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.InjectionPoint;
@@ -650,7 +651,7 @@ public abstract class Injector {
                     SignaturePrinter.getTypeName(fromType), argIndex, SignaturePrinter.getTypeName(toType), coerceWarning));
         }
         
-        boolean canCoerce = Injector.canCoerce(fromType, toType);
+        boolean canCoerce = canCoerce(fromType, toType);
         if (!canCoerce) {
             throw new InvalidInjectionException(this.info, String.format(
                     "%s has an invalid signature. Cannot @Coerce %s type %s%s to %s", description, argType,
@@ -685,14 +686,14 @@ public abstract class Injector {
      * @param to type to coerce to
      * @return true if <tt>from</tt> can be coerced to <tt>to</tt>
      */
-    public static boolean canCoerce(Type from, Type to) {
+    public boolean canCoerce(Type from, Type to) {
         int fromSort = from.getSort();
         int toSort = to.getSort();
         if (fromSort >= Type.ARRAY && toSort >= Type.ARRAY && fromSort == toSort) {
             if (fromSort == Type.ARRAY && from.getDimensions() != to.getDimensions()) {
                 return false;
             }
-            return Injector.canCoerce(ClassInfo.forType(from, TypeLookup.ELEMENT_TYPE), ClassInfo.forType(to, TypeLookup.ELEMENT_TYPE));
+            return Injector.canCoerce(ClassInfo.forType(info.getEnvironment(), from, TypeLookup.ELEMENT_TYPE), ClassInfo.forType(info.getEnvironment(), to, TypeLookup.ELEMENT_TYPE));
         }
         
         return Injector.canCoerce(from.getDescriptor(), to.getDescriptor());

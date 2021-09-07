@@ -24,8 +24,6 @@
  */
 package org.spongepowered.asm.mixin.connect;
 
-import org.spongepowered.asm.mixin.Mixins;
-
 /**
  * A connector class is a bootstrap agent for a mixin consumer. It should call
  * back against {@link Mixins} to register its resources much like previous

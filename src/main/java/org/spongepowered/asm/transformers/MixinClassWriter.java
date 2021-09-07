@@ -26,6 +26,7 @@ package org.spongepowered.asm.transformers;
 
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
+import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.transformer.ClassInfo;
 
 /**
@@ -34,12 +35,16 @@ import org.spongepowered.asm.mixin.transformer.ClassInfo;
  */
 public class MixinClassWriter extends ClassWriter {
 
-    public MixinClassWriter(int flags) {
+    private final MixinEnvironment environment;
+
+    public MixinClassWriter(int flags, MixinEnvironment environment) {
         super(flags);
+        this.environment = environment;
     }
 
-    public MixinClassWriter(ClassReader classReader, int flags) {
+    public MixinClassWriter(ClassReader classReader, int flags, MixinEnvironment environment) {
         super(classReader, flags);
+        this.environment = environment;
     }
 
     /* (non-Javadoc)
@@ -48,7 +53,7 @@ public class MixinClassWriter extends ClassWriter {
      */
     @Override
     protected String getCommonSuperClass(final String type1, final String type2) {
-        return ClassInfo.getCommonSuperClass(type1, type2).getName();
+        return ClassInfo.getCommonSuperClass(environment, type1, type2).getName();
     }
 
 }

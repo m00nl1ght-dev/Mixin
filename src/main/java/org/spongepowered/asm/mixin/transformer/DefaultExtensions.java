@@ -49,7 +49,7 @@ final class DefaultExtensions {
             }
         };
         
-        extensions.add(new ArgsClassGenerator(registryDelegate));
+        extensions.add(new ArgsClassGenerator(registryDelegate, environment.getOption(MixinEnvironment.Option.DEBUG_VERIFY)));
         extensions.add(new InnerClassGenerator(registryDelegate));
 
         extensions.add(new ExtensionClassExporter(environment));

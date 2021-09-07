@@ -178,7 +178,7 @@ public class ModifyConstantInjector extends RedirectInjector {
                     + SignaturePrinter.getTypeName(target.returnType, false));
         } else if (pop.getOpcode() == Opcodes.ISTORE) { // Integer store, attempt to get the relevant local type
             int var = ((VarInsnNode)pop).var;
-            LocalVariableNode localVar = Locals.getLocalVariableAt(target.classNode, target.method, pop, var);
+            LocalVariableNode localVar = Locals.getLocalVariableAt(info.getEnvironment(), target.classNode, target.method, pop, var);
 
             // Frankly this will not work in 90% of cases, it basically only works if the variable being assigned is actually
             // a method argument, and is pretty much never going to work for any other type of local variable

@@ -59,6 +59,7 @@ import org.spongepowered.asm.mixin.injection.throwables.InjectionValidationExcep
 import org.spongepowered.asm.mixin.injection.throwables.InvalidInjectionException;
 import org.spongepowered.asm.mixin.refmap.IMixinContext;
 import org.spongepowered.asm.mixin.refmap.IReferenceMapper;
+import org.spongepowered.asm.mixin.refmap.ReferenceMapper;
 import org.spongepowered.asm.mixin.struct.MemberRef;
 import org.spongepowered.asm.mixin.struct.SourceMap.File;
 import org.spongepowered.asm.mixin.throwables.ClassMetadataNotFoundException;
@@ -273,7 +274,7 @@ public class MixinTargetContext extends ClassContext implements IMixinContext {
      * @return mixin parent environment
      */
     public MixinEnvironment getEnvironment() {
-        return this.mixin.getParent().getEnvironment();
+        return this.mixin.getEnvironment();
     }
     
     /* (non-Javadoc)
@@ -573,7 +574,7 @@ public class MixinTargetContext extends ClassContext implements IMixinContext {
         } else if (this.detachedSuper || this.inheritsFromMixin) {
             if (methodRef.getOpcode() == Opcodes.INVOKESPECIAL) {
                 this.updateStaticBinding(method, methodRef);
-            } else if (methodRef.getOpcode() == Opcodes.INVOKEVIRTUAL && ClassInfo.forName(methodRef.getOwner()).isMixin()) {
+            } else if (methodRef.getOpcode() == Opcodes.INVOKEVIRTUAL && ClassInfo.forName(getEnvironment(), methodRef.getOwner()).isMixin()) {
                 this.updateDynamicBinding(method, methodRef);
             }
         }
@@ -611,7 +612,7 @@ public class MixinTargetContext extends ClassContext implements IMixinContext {
                 fieldRef.setName(field.getName());
             }
         } else {
-            ClassInfo fieldOwner = ClassInfo.forName(fieldRef.getOwner());
+            ClassInfo fieldOwner = ClassInfo.forName(getEnvironment(), fieldRef.getOwner());
             if (fieldOwner.isMixin()) {
                 ClassInfo actualOwner = this.targetClassInfo.findCorrespondingType(fieldOwner);
                 fieldRef.setOwner(actualOwner != null ? actualOwner.getName() : this.getTarget().getClassRef());
@@ -637,7 +638,7 @@ public class MixinTargetContext extends ClassContext implements IMixinContext {
             Field shadowField = shadow.getValue();
             if (shadowField.isDecoratedFinal()) {
                 if (shadowField.isDecoratedMutable()) {
-                    if (this.mixin.getParent().getEnvironment().getOption(Option.DEBUG_VERBOSE)) {
+                    if (this.mixin.getEnvironment().getOption(Option.DEBUG_VERBOSE)) {
                         MixinTargetContext.logger.warn("Write access to @Mutable @Final field {} in {}::{}", shadowField, this.mixin, method.name);
                     }                    
                 } else {
@@ -645,7 +646,7 @@ public class MixinTargetContext extends ClassContext implements IMixinContext {
                         MixinTargetContext.logger.warn("@Final field {} in {} should be final", shadowField, this.mixin);
                     } else {
                         MixinTargetContext.logger.error("Write access detected to @Final field {} in {}::{}", shadowField, this.mixin, method.name);
-                        if (this.mixin.getParent().getEnvironment().getOption(Option.DEBUG_VERIFY)) {
+                        if (this.mixin.getEnvironment().getOption(Option.DEBUG_VERIFY)) {
                             throw new InvalidMixinException(this.mixin, "Write access detected to @Final field " + shadowField + " in " + this.mixin
                                     + "::" + method.name);
                         }
@@ -771,7 +772,7 @@ public class MixinTargetContext extends ClassContext implements IMixinContext {
     private ConstantDynamic transformDynamicConstant(MethodNode method, Iterator<AbstractInsnNode> iter, ConstantDynamic constant) {
         this.requireVersion(Opcodes.V11);
         
-        if (!MixinEnvironment.getCompatibilityLevel().supports(LanguageFeatures.DYNAMIC_CONSTANTS)) {
+        if (!getEnvironment().getCompatibilityLevel().supports(LanguageFeatures.DYNAMIC_CONSTANTS)) {
             // Shouldn't get here because we should error out during the initial scan, but you never know
             throw new InvalidMixinException(this, String.format(
                     "%s%s in %s contains a dynamic constant, which is not supported by the current compatibility level",
@@ -873,7 +874,7 @@ public class MixinTargetContext extends ClassContext implements IMixinContext {
                         + " but is mixin.");
             }
             methodRef.setOwner(superMethod.getImplementor().getName());
-        } else if (ClassInfo.forName(methodRef.getOwner()).isMixin()) {
+        } else if (ClassInfo.forName(getEnvironment(), methodRef.getOwner()).isMixin()) {
             throw new MixinTransformerError("Error resolving " + methodRef + " in " + this);
         }
     }
@@ -981,7 +982,7 @@ public class MixinTargetContext extends ClassContext implements IMixinContext {
             descriptorActivity.end();
             return desc;
         }
-        ClassInfo typeInfo = ClassInfo.forName(type);
+        ClassInfo typeInfo = ClassInfo.forName(getEnvironment(), type);
         if (typeInfo == null) {
             throw new ClassMetadataNotFoundException(type.replace('/', '.'));
         }

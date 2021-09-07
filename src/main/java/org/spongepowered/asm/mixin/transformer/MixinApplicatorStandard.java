@@ -24,10 +24,7 @@
  */
 package org.spongepowered.asm.mixin.transformer;
 
-import java.lang.annotation.Annotation;
-import java.util.*;
-import java.util.Map.Entry;
-
+import com.google.common.collect.ImmutableList;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.objectweb.asm.Label;
@@ -43,12 +40,7 @@ import org.spongepowered.asm.mixin.MixinEnvironment.Option;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
-import org.spongepowered.asm.mixin.injection.Inject;
-import org.spongepowered.asm.mixin.injection.ModifyArg;
-import org.spongepowered.asm.mixin.injection.ModifyArgs;
-import org.spongepowered.asm.mixin.injection.ModifyConstant;
-import org.spongepowered.asm.mixin.injection.ModifyVariable;
-import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.*;
 import org.spongepowered.asm.mixin.throwables.MixinError;
 import org.spongepowered.asm.mixin.transformer.ActivityStack.Activity;
 import org.spongepowered.asm.mixin.transformer.ClassInfo.Field;
@@ -59,24 +51,22 @@ import org.spongepowered.asm.mixin.transformer.throwables.InvalidMixinException;
 import org.spongepowered.asm.mixin.transformer.throwables.MixinApplicatorException;
 import org.spongepowered.asm.service.IMixinAuditTrail;
 import org.spongepowered.asm.service.MixinService;
-import org.spongepowered.asm.util.Annotations;
-import org.spongepowered.asm.util.Bytecode;
+import org.spongepowered.asm.util.*;
 import org.spongepowered.asm.util.Bytecode.DelegateInitialiser;
-import org.spongepowered.asm.util.Constants;
-import org.spongepowered.asm.util.ConstraintParser;
-import org.spongepowered.asm.util.LanguageFeatures;
 import org.spongepowered.asm.util.ConstraintParser.Constraint;
 import org.spongepowered.asm.util.perf.Profiler;
 import org.spongepowered.asm.util.perf.Profiler.Section;
 import org.spongepowered.asm.util.throwables.ConstraintViolationException;
 import org.spongepowered.asm.util.throwables.InvalidConstraintException;
 
-import com.google.common.collect.ImmutableList;
+import java.lang.annotation.Annotation;
+import java.util.*;
+import java.util.Map.Entry;
 
 /**
  * Applies mixins to a target class
  */
-class MixinApplicatorStandard {
+public class MixinApplicatorStandard {
     
     /**
      * Annotations which can have constraints
@@ -131,7 +121,7 @@ class MixinApplicatorStandard {
     /**
      * Internal struct for representing a range
      */
-    class Range {
+    public class Range {
         /**
          * Start of the range
          */
@@ -238,12 +228,7 @@ class MixinApplicatorStandard {
      * Target class info 
      */
     protected final ClassInfo targetClassInfo;
-    
-    /**
-     * Profiler 
-     */
-    protected final Profiler profiler = MixinEnvironment.getProfiler();
-    
+
     /**
      * Audit trail (if available); 
      */
@@ -270,7 +255,7 @@ class MixinApplicatorStandard {
         
         ExtensionClassExporter exporter = context.getExtensions().<ExtensionClassExporter>getExtension(ExtensionClassExporter.class);
         this.mergeSignatures = exporter.isDecompilerActive()
-                && MixinEnvironment.getCurrentEnvironment().getOption(Option.DEBUG_EXPORT_DECOMPILE_MERGESIGNATURES);
+                && context.getEnvironment().getOption(Option.DEBUG_EXPORT_DECOMPILE_MERGESIGNATURES);
         
         this.auditTrail = MixinService.getService().getAuditTrail();
     }
@@ -312,7 +297,8 @@ class MixinApplicatorStandard {
             
             for (ApplicatorPass pass : ApplicatorPass.values()) {
                 activity.next("%s Applicator Phase", pass);
-                Section timer = this.profiler.begin("pass", pass.name().toLowerCase(Locale.ROOT));
+                final Profiler profiler = context.getEnvironment().getProfiler();
+                Section timer = profiler.begin("pass", pass.name().toLowerCase(Locale.ROOT));
                 Activity applyActivity = this.activities.begin("Mixin");
                 for (Iterator<MixinTargetContext> iter = mixinContexts.iterator(); iter.hasNext();) {
                     current = iter.next();
@@ -1044,7 +1030,7 @@ class MixinApplicatorStandard {
             return;
         }
         
-        if (!MixinEnvironment.getCompatibilityLevel().supports(LanguageFeatures.NESTING)) {
+        if (!context.getEnvironment().getCompatibilityLevel().supports(LanguageFeatures.NESTING)) {
             // Shouldn't get here because we should error out during the initial scan, but you never know
             throw new InvalidMixinException(mixin,
                     String.format("%s contains nesting information but the current compatibility level does not support class nesting attributes",

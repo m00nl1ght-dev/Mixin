@@ -24,8 +24,6 @@
  */
 package org.spongepowered.asm.mixin.transformer;
 
-import java.util.Locale;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.objectweb.asm.tree.ClassNode;
@@ -34,8 +32,9 @@ import org.spongepowered.asm.mixin.transformer.ext.Extensions;
 import org.spongepowered.asm.mixin.transformer.ext.IClassGenerator;
 import org.spongepowered.asm.service.IMixinAuditTrail;
 import org.spongepowered.asm.service.MixinService;
-import org.spongepowered.asm.util.perf.Profiler;
 import org.spongepowered.asm.util.perf.Profiler.Section;
+
+import java.util.Locale;
 
 /**
  * Handles delegation of class generation tasks to the extensions
@@ -53,11 +52,6 @@ public class MixinClassGenerator {
     private final Extensions extensions;
     
     /**
-     * Profiler 
-     */
-    private final Profiler profiler;
-    
-    /**
      * Audit trail (if available); 
      */
     private final IMixinAuditTrail auditTrail;
@@ -67,7 +61,6 @@ public class MixinClassGenerator {
      */
     MixinClassGenerator(MixinEnvironment environment, Extensions extensions) {
         this.extensions = extensions;
-        this.profiler = MixinEnvironment.getProfiler();
         this.auditTrail = MixinService.getService().getAuditTrail();
     }
 
@@ -78,7 +71,7 @@ public class MixinClassGenerator {
         }
         
         for (IClassGenerator generator : this.extensions.getGenerators()) {
-            Section genTimer = this.profiler.begin("generator", generator.getClass().getSimpleName().toLowerCase(Locale.ROOT));
+            Section genTimer = environment.getProfiler().begin("generator", generator.getClass().getSimpleName().toLowerCase(Locale.ROOT));
             boolean success = generator.generate(name, classNode);
             genTimer.end();
             if (success) {

@@ -85,7 +85,7 @@ public class ExtensionCheckClass implements IExtension {
     @Override
     public void postApply(ITargetClassContext context) {
         try {
-            context.getClassNode().accept(new CheckClassAdapter(new MixinClassWriter(ClassWriter.COMPUTE_FRAMES)));
+            context.getClassNode().accept(new CheckClassAdapter(new MixinClassWriter(ClassWriter.COMPUTE_FRAMES, context.getEnvironment())));
         } catch (RuntimeException ex) {
             throw new ValidationFailedException(ex.getMessage(), ex);
         }

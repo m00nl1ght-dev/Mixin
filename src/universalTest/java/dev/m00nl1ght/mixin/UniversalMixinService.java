@@ -58,7 +58,7 @@ public class UniversalMixinService extends MixinServiceAbstract implements IClas
     private UniversalTestClassLoader classLoader;
 
     public void init() {
-        environment = new MixinEnvironment();
+        environment = new MixinEnvironment(this);
         classLoader = new UniversalTestClassLoader(ClassLoader.getSystemClassLoader(), classSource, resDir);
         classLoader.setTransformer(new MixinTransformer(environment));
     }
@@ -208,7 +208,7 @@ public class UniversalMixinService extends MixinServiceAbstract implements IClas
         String transformedName = className.replace('/', '.');
         String name = transformedName;
         
-        Profiler profiler = MixinEnvironment.getProfiler();
+        Profiler profiler = environment.getProfiler();
         Section loadTime = profiler.begin(Profiler.ROOT, "class.load");
         byte[] classBytes = this.getClassBytes(name, transformedName);
         loadTime.end();
@@ -243,5 +243,9 @@ public class UniversalMixinService extends MixinServiceAbstract implements IClas
         classReader.accept(classNode, flags);
         return classNode;
     }
-    
+
+    public MixinEnvironment getEnvironment() {
+        return environment;
+    }
+
 }

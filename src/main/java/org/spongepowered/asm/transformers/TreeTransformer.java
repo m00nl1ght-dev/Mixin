@@ -27,6 +27,7 @@ package org.spongepowered.asm.transformers;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
+import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.service.ILegacyClassTransformer;
 
 /**
@@ -36,6 +37,12 @@ public abstract class TreeTransformer implements ILegacyClassTransformer {
 
     private ClassReader classReader;
     private ClassNode classNode;
+
+    protected final MixinEnvironment environment;
+
+    protected TreeTransformer(MixinEnvironment environment) {
+        this.environment = environment;
+    }
 
     /**
      * @param basicClass Original bytecode
@@ -70,7 +77,7 @@ public abstract class TreeTransformer implements ILegacyClassTransformer {
         // Use optimised writer for speed
         if (this.classReader != null && this.classNode == classNode) {
             this.classNode = null;
-            ClassWriter writer = new MixinClassWriter(this.classReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+            ClassWriter writer = new MixinClassWriter(this.classReader, ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, environment);
             this.classReader = null;
             classNode.accept(writer);
             return writer.toByteArray();
@@ -78,7 +85,7 @@ public abstract class TreeTransformer implements ILegacyClassTransformer {
 
         this.classNode = null;
 
-        ClassWriter writer = new MixinClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        ClassWriter writer = new MixinClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, environment);
         classNode.accept(writer);
         return writer.toByteArray();
     }

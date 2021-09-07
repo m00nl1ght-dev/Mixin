@@ -24,10 +24,10 @@
  */
 package org.spongepowered.asm.mixin.extensibility;
 
-import java.util.List;
-
 import org.objectweb.asm.tree.ClassNode;
-import org.spongepowered.asm.mixin.MixinEnvironment.Phase;
+import org.spongepowered.asm.mixin.MixinEnvironment;
+
+import java.util.List;
 
 /**
  * Interface for MixinInfo, used in extensibility API
@@ -99,11 +99,6 @@ public interface IMixinInfo {
      */
     public abstract int getPriority();
 
-    /**
-     * Get the mixin phase
-     * 
-     * @return the phase
-     */
-    public abstract Phase getPhase();
+    public MixinEnvironment getEnvironment();
     
 }

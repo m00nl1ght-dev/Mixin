@@ -45,6 +45,7 @@ import org.objectweb.asm.tree.analysis.Analyzer;
 import org.objectweb.asm.tree.analysis.AnalyzerException;
 import org.objectweb.asm.tree.analysis.BasicValue;
 import org.objectweb.asm.tree.analysis.Frame;
+import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.transformer.ClassInfo;
 import org.spongepowered.asm.mixin.transformer.ClassInfo.FrameData;
 import org.spongepowered.asm.mixin.transformer.ClassInfo.Method;
@@ -144,7 +145,7 @@ public final class Locals {
      * @return A sparse array containing a view (hopefully) of the locals at the
      *      specified location
      */
-    public static LocalVariableNode[] getLocalsAt(ClassNode classNode, MethodNode method, AbstractInsnNode node) {
+    public static LocalVariableNode[] getLocalsAt(MixinEnvironment environment, ClassNode classNode, MethodNode method, AbstractInsnNode node) {
         for (int i = 0; i < 3 && (node instanceof LabelNode || node instanceof LineNumberNode); i++) {
             AbstractInsnNode nextNode = Locals.nextNode(method.instructions, node);
             if (nextNode instanceof FrameNode) { // Do not ffwd over frames
@@ -153,7 +154,7 @@ public final class Locals {
             node = nextNode;
         }
         
-        ClassInfo classInfo = ClassInfo.forName(classNode.name);
+        ClassInfo classInfo = ClassInfo.forName(environment, classNode.name);
         if (classInfo == null) {
             throw new LVTGeneratorError("Could not load class metadata for " + classNode.name + " generating LVT for " + method.name);
         }
@@ -187,7 +188,7 @@ public final class Locals {
         for (Iterator<AbstractInsnNode> iter = method.instructions.iterator(); iter.hasNext();) {
             AbstractInsnNode insn = iter.next();
             if (storeInsn != null) {
-                LocalVariableNode storedLocal = Locals.getLocalVariableAt(classNode, method, insn, storeInsn.var);
+                LocalVariableNode storedLocal = Locals.getLocalVariableAt(environment, classNode, method, insn, storeInsn.var);
                 frame[storeInsn.var] = storedLocal;
                 knownFrameSize = Math.max(knownFrameSize, storeInsn.var + 1);
                 if (storedLocal != null && storeInsn.var < method.maxLocals - 1 && storedLocal.desc != null
@@ -243,7 +244,7 @@ public final class Locals {
                     final Object localType = (localPos < frameNode.local.size()) ? frameNode.local.get(localPos) : null;
 
                     if (localType instanceof String) { // String refers to a reference type
-                        frame[framePos] = Locals.getLocalVariableAt(classNode, method, insn, framePos);
+                        frame[framePos] = Locals.getLocalVariableAt(environment, classNode, method, insn, framePos);
                     } else if (localType instanceof Integer) { // Integer refers to a primitive type or other marker
                         boolean isMarkerType = localType == Opcodes.UNINITIALIZED_THIS || localType == Opcodes.NULL;
                         boolean is32bitValue = localType == Opcodes.INTEGER || localType == Opcodes.FLOAT;
@@ -253,7 +254,7 @@ public final class Locals {
                         } else if (isMarkerType) {
                             frame[framePos] = null;
                         } else if (is32bitValue || is64bitValue) {
-                            frame[framePos] = Locals.getLocalVariableAt(classNode, method, insn, framePos);
+                            frame[framePos] = Locals.getLocalVariableAt(environment, classNode, method, insn, framePos);
 
                             if (is64bitValue) {
                                 framePos++;
@@ -266,7 +267,7 @@ public final class Locals {
                     } else if (localType == null) {
                         if (framePos >= initialFrameSize && framePos >= frameSize && frameSize > 0) {
                             if (framePos < knownFrameSize) {
-                                frame[framePos] = Locals.getLocalVariableAt(classNode, method, insn, framePos);
+                                frame[framePos] = Locals.getLocalVariableAt(environment, classNode, method, insn, framePos);
                             } else {
                                 frame[framePos] = null;
                             }
@@ -282,7 +283,7 @@ public final class Locals {
                 VarInsnNode varNode = (VarInsnNode) insn;
                 boolean isLoad = insn.getOpcode() >= Opcodes.ILOAD && insn.getOpcode() <= Opcodes.SALOAD;
                 if (isLoad) {
-                    frame[varNode.var] = Locals.getLocalVariableAt(classNode, method, insn, varNode.var);
+                    frame[varNode.var] = Locals.getLocalVariableAt(environment, classNode, method, insn, varNode.var);
                     int varSize = frame[varNode.var].desc != null ? Type.getType(frame[varNode.var].desc).getSize() : 1;
                     knownFrameSize = Math.max(knownFrameSize, varNode.var + varSize);
                 } else {
@@ -320,8 +321,8 @@ public final class Locals {
      * @return a LocalVariableNode containing information about the local
      *      variable at the specified location in the specified local slot
      */
-    public static LocalVariableNode getLocalVariableAt(ClassNode classNode, MethodNode method, AbstractInsnNode node, int var) {
-        return Locals.getLocalVariableAt(classNode, method, method.instructions.indexOf(node), var);
+    public static LocalVariableNode getLocalVariableAt(MixinEnvironment environment, ClassNode classNode, MethodNode method, AbstractInsnNode node, int var) {
+        return Locals.getLocalVariableAt(environment, classNode, method, method.instructions.indexOf(node), var);
     }
 
     /**
@@ -335,11 +336,11 @@ public final class Locals {
      * @return a LocalVariableNode containing information about the local
      *      variable at the specified location in the specified local slot
      */
-    private static LocalVariableNode getLocalVariableAt(ClassNode classNode, MethodNode method, int pos, int var) {
+    private static LocalVariableNode getLocalVariableAt(MixinEnvironment environment, ClassNode classNode, MethodNode method, int pos, int var) {
         LocalVariableNode localVariableNode = null;
         LocalVariableNode fallbackNode = null;
 
-        for (LocalVariableNode local : Locals.getLocalVariableTable(classNode, method)) {
+        for (LocalVariableNode local : Locals.getLocalVariableTable(environment, classNode, method)) {
             if (local.index != var) {
                 continue;
             }
@@ -351,7 +352,7 @@ public final class Locals {
         }
         
         if (localVariableNode == null && !method.localVariables.isEmpty()) {
-            for (LocalVariableNode local : Locals.getGeneratedLocalVariableTable(classNode, method)) {
+            for (LocalVariableNode local : Locals.getGeneratedLocalVariableTable(environment, classNode, method)) {
                 if (local.index == var && Locals.isOpcodeInRange(method.instructions, local, pos)) {
                     localVariableNode = local;
                 }
@@ -376,9 +377,9 @@ public final class Locals {
      * @param method Method
      * @return local variable table 
      */
-    public static List<LocalVariableNode> getLocalVariableTable(ClassNode classNode, MethodNode method) {
+    public static List<LocalVariableNode> getLocalVariableTable(MixinEnvironment environment, ClassNode classNode, MethodNode method) {
         if (method.localVariables.isEmpty()) {
-            return Locals.getGeneratedLocalVariableTable(classNode, method);
+            return Locals.getGeneratedLocalVariableTable(environment, classNode, method);
         }
         return method.localVariables;
     }
@@ -390,14 +391,14 @@ public final class Locals {
      * @param method Method
      * @return generated local variable table 
      */
-    public static List<LocalVariableNode> getGeneratedLocalVariableTable(ClassNode classNode, MethodNode method) {
+    public static List<LocalVariableNode> getGeneratedLocalVariableTable(MixinEnvironment environment, ClassNode classNode, MethodNode method) {
         String methodId = String.format("%s.%s%s", classNode.name, method.name, method.desc);
         List<LocalVariableNode> localVars = Locals.calculatedLocalVariables.get(methodId);
         if (localVars != null) {
             return localVars;
         }
 
-        localVars = Locals.generateLocalVariableTable(classNode, method);
+        localVars = Locals.generateLocalVariableTable(environment, classNode, method);
         Locals.calculatedLocalVariables.put(methodId, localVars);
         return localVars;
     }
@@ -410,7 +411,7 @@ public final class Locals {
      * @param method Method
      * @return generated local variable table
      */
-    public static List<LocalVariableNode> generateLocalVariableTable(ClassNode classNode, MethodNode method) {
+    public static List<LocalVariableNode> generateLocalVariableTable(MixinEnvironment environment, ClassNode classNode, MethodNode method) {
         List<Type> interfaces = null;
         if (classNode.interfaces != null) {
             interfaces = new ArrayList<Type>();
@@ -426,7 +427,7 @@ public final class Locals {
 
         // Use Analyzer to generate the bytecode frames
         Analyzer<BasicValue> analyzer = new Analyzer<BasicValue>(
-                new MixinVerifier(ASM.API_VERSION, Type.getObjectType(classNode.name), objectType, interfaces, false));
+                new MixinVerifier(ASM.API_VERSION, environment, Type.getObjectType(classNode.name), objectType, interfaces, false));
         try {
             analyzer.analyze(classNode.name, method);
         } catch (AnalyzerException ex) {

@@ -24,20 +24,10 @@
  */
 package org.spongepowered.asm.mixin.transformer;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.AnnotationNode;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.FieldNode;
-import org.objectweb.asm.tree.InsnNode;
-import org.objectweb.asm.tree.MethodInsnNode;
-import org.objectweb.asm.tree.MethodNode;
-import org.spongepowered.asm.mixin.MixinEnvironment;
+import org.objectweb.asm.tree.*;
+import org.spongepowered.asm.mixin.extensibility.IMixinConfig;
 import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
 import org.spongepowered.asm.mixin.transformer.ClassInfo.Method;
@@ -50,12 +40,17 @@ import org.spongepowered.asm.util.Bytecode;
 import org.spongepowered.asm.util.Bytecode.Visibility;
 import org.spongepowered.asm.util.LanguageFeatures;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
 /**
  * Performs post-processing tasks required for certain classes which pass
  * through the mixin transformer, such as transforming synthetic inner classes
  * and populating accessor methods in accessor mixins.
  */
-class MixinPostProcessor implements MixinConfig.IListener {
+class MixinPostProcessor implements IMixinConfig.IListener {
 
     /**
      * Transformer session ID
@@ -163,7 +158,7 @@ class MixinPostProcessor implements MixinConfig.IListener {
     }
 
     private boolean processAccessor(ClassNode classNode, MixinInfo mixin) {
-        if (!MixinEnvironment.getCompatibilityLevel().supports(LanguageFeatures.METHODS_IN_INTERFACES)) {
+        if (!mixin.getEnvironment().getCompatibilityLevel().supports(LanguageFeatures.METHODS_IN_INTERFACES)) {
             return false;
         }
         

@@ -47,6 +47,7 @@ import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.spongepowered.asm.mixin.Dynamic;
 import org.spongepowered.asm.mixin.Final;
+import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.MixinEnvironment.Option;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 import org.spongepowered.asm.mixin.injection.Inject;
@@ -685,6 +686,10 @@ public abstract class InjectionInfo extends SpecialMethodInfo implements ISliceC
             description = String.format("{%s} %s", upstream.getClassName(), description).trim();
         }
         return description.length() > 0 ? String.format(" Method is @Dynamic(%s).", description) : "";
+    }
+
+    public MixinEnvironment getEnvironment() {
+        return mixin.getEnvironment();
     }
 
     /**

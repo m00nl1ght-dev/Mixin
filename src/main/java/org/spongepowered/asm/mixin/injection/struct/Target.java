@@ -24,20 +24,10 @@
  */
 package org.spongepowered.asm.mixin.injection.struct;
 
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.InsnList;
-import org.objectweb.asm.tree.LabelNode;
-import org.objectweb.asm.tree.LocalVariableNode;
-import org.objectweb.asm.tree.MethodInsnNode;
-import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.TypeInsnNode;
+import org.objectweb.asm.tree.*;
+import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.struct.InjectionNodes.InjectionNode;
 import org.spongepowered.asm.mixin.transformer.ClassInfo;
@@ -45,6 +35,10 @@ import org.spongepowered.asm.util.Bytecode;
 import org.spongepowered.asm.util.Bytecode.DelegateInitialiser;
 import org.spongepowered.asm.util.Constants;
 import org.spongepowered.asm.util.Locals.SyntheticLocalVariableNode;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 /**
  * Information about the current injection target, mainly just convenience
@@ -237,12 +231,15 @@ public class Target implements Comparable<Target>, Iterable<AbstractInsnNode> {
      */
     private DelegateInitialiser delegateInitialiser;
 
+    private final MixinEnvironment environment;
+
     /**
      * Make a new Target for the supplied method
-     * 
+     *
      * @param method target method
      */
-    public Target(ClassNode classNode, MethodNode method) {
+    public Target(MixinEnvironment environment, ClassNode classNode, MethodNode method) {
+        this.environment = environment;
         this.classNode = classNode;
         this.method = method;
         this.insns = method.instructions;
@@ -651,7 +648,7 @@ public class Target implements Comparable<Target>, Iterable<AbstractInsnNode> {
         }
         
         if (this.delegateInitialiser == null) {
-            String superName = ClassInfo.forName(this.classNode.name).getSuperName();
+            String superName = ClassInfo.forName(environment, this.classNode.name).getSuperName();
             this.delegateInitialiser = Bytecode.findDelegateInit(this.method, superName, this.classNode.name);
         }
         
@@ -804,6 +801,10 @@ public class Target implements Comparable<Target>, Iterable<AbstractInsnNode> {
             this.insns.add(this.end = new LabelNode());
         }
         return this.end;
+    }
+
+    public MixinEnvironment getEnvironment() {
+        return environment;
     }
 
 }

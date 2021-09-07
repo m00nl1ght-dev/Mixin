@@ -24,15 +24,6 @@
  */
 package org.spongepowered.asm.mixin.transformer;
 
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.SortedSet;
-
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.objectweb.asm.tree.AnnotationNode;
@@ -51,6 +42,8 @@ import org.spongepowered.asm.util.Annotations;
 import org.spongepowered.asm.util.Bytecode;
 import org.spongepowered.asm.util.ClassSignature;
 
+import java.util.*;
+
 /**
  * Struct for containing target class information during mixin application
  */
@@ -64,7 +57,7 @@ final class TargetClassContext extends ClassContext implements ITargetClassConte
     /**
      * Mixin environment
      */
-    private final MixinEnvironment env;
+    private final MixinEnvironment environment;
 
     /**
      * Mixin transformer extensions
@@ -136,13 +129,13 @@ final class TargetClassContext extends ClassContext implements ITargetClassConte
      */
     private boolean forceExport;
 
-    TargetClassContext(MixinEnvironment env, Extensions extensions, String sessionId, String name, ClassNode classNode, SortedSet<MixinInfo> mixins) {
-        this.env = env;
+    TargetClassContext(MixinEnvironment environment, Extensions extensions, String sessionId, String name, ClassNode classNode, SortedSet<MixinInfo> mixins) {
+        this.environment = environment;
         this.extensions = extensions;
         this.sessionId = sessionId;
         this.className = name;
         this.classNode = classNode;
-        this.classInfo = ClassInfo.fromClassNode(classNode);
+        this.classInfo = ClassInfo.fromClassNode(environment, classNode);
         this.signature = this.classInfo.getSignature();
         this.mixins = mixins;
         this.sourceMap = new SourceMap(classNode.sourceFile);
@@ -326,7 +319,7 @@ final class TargetClassContext extends ClassContext implements ITargetClassConte
         String targetName = method.name + method.desc;
         Target target = this.targetMethods.get(targetName);
         if (target == null) {
-            target = new Target(this.classNode, method);
+            target = new Target(environment, this.classNode, method);
             this.targetMethods.put(targetName, target);
         }
         return target;
@@ -374,7 +367,7 @@ final class TargetClassContext extends ClassContext implements ITargetClassConte
         AnnotationNode classDebugAnnotation = Annotations.getVisible(this.classNode, Debug.class);
         this.forceExport = classDebugAnnotation != null && Boolean.TRUE.equals(Annotations.<Boolean>getValue(classDebugAnnotation, "export"));
         
-        if (!this.env.getOption(Option.DEBUG_VERBOSE)) {
+        if (!this.environment.getOption(Option.DEBUG_VERBOSE)) {
             return;
         }
 
@@ -399,5 +392,10 @@ final class TargetClassContext extends ClassContext implements ITargetClassConte
     List<InvalidMixinException> getSuppressedExceptions() {
         return this.suppressedExceptions;
     }
-    
+
+    @Override
+    public MixinEnvironment getEnvironment() {
+        return environment;
+    }
+
 }

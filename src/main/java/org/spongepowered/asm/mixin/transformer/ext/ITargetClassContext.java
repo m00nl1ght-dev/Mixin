@@ -25,6 +25,7 @@
 package org.spongepowered.asm.mixin.transformer.ext;
 
 import org.objectweb.asm.tree.ClassNode;
+import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.transformer.ClassInfo;
 
 /**
@@ -42,5 +43,7 @@ public interface ITargetClassContext {
      * Get the class tree
      */
     public abstract ClassNode getClassNode();
+
+    public abstract MixinEnvironment getEnvironment();
 
 }

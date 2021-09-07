@@ -24,7 +24,10 @@
  */
 package dev.m00nl1ght.mixin;
 
+import org.spongepowered.asm.mixin.transformer.MixinConfig;
 import org.spongepowered.asm.service.MixinService;
+
+import java.util.Collections;
 
 /**
  * Test runner for universal mixin example.
@@ -45,11 +48,18 @@ public final class UniversalTest {
         final UniversalMixinService service = (UniversalMixinService) MixinService.getService();
         service.init();
 
-        // MixinEnvironment.init(MixinEnvironment.Phase.PREINIT);
+        service.getClassLoader().addExcludedPackage("dev.m00nl1ght.mixin.example.mixins");
 
-        // Mixins.addConfiguration(CONFIG_FILE);
+        final MixinConfig config = new MixinConfig("test");
+        config.setMixinPackage("dev.m00nl1ght.mixin.example.mixins");
+        config.setMixinClasses(Collections.singletonList("TestClassMixin"));
+        config.setMinVersion("0.8.3");
+        config.setVerboseLogging(true);
+        config.setRequired(true);
 
-        // service.getClassLoader().addExcludedPackage("dev.m00nl1ght.mixin.example.mixins");
+        config.init(service.getEnvironment());
+        service.getEnvironment().registerConfig(config);
+
         final Class<?> testClass = service.getClassLoader().loadClass(TEST_CLASS_NAME);
         final TestInterface testInstance = (TestInterface) testClass.getConstructor().newInstance();
 

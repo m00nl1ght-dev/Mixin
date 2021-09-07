@@ -123,6 +123,8 @@ public final class ArgsClassGenerator implements IClassGenerator {
      */
     private final IConsumer<ISyntheticClassInfo> registry;
 
+    private final boolean verify;
+
     /**
      * The next subclass number, classes generated in sequence eg.
      * <tt>Args$1</tt>, <tt>Args$2</tt>, etc. 
@@ -144,8 +146,9 @@ public final class ArgsClassGenerator implements IClassGenerator {
      * 
      * @param registry sythetic class registry
      */
-    public ArgsClassGenerator(IConsumer<ISyntheticClassInfo> registry) {
+    public ArgsClassGenerator(IConsumer<ISyntheticClassInfo> registry, boolean verify) {
         this.registry = registry;
+        this.verify = verify;
     }
     
     /* (non-Javadoc)
@@ -199,7 +202,7 @@ public final class ArgsClassGenerator implements IClassGenerator {
         }
         
         ClassVisitor visitor = classNode;
-        if (MixinEnvironment.getCurrentEnvironment().getOption(Option.DEBUG_VERIFY)) {
+        if (verify) {
             visitor = new CheckClassAdapter(classNode);
         }
         

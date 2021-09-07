@@ -33,6 +33,7 @@ import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.TypeInsnNode;
 import org.objectweb.asm.tree.VarInsnNode;
+import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.refmap.IMixinContext;
 import org.spongepowered.asm.mixin.throwables.MixinException;
 import org.spongepowered.asm.mixin.transformer.ClassInfo;
@@ -140,6 +141,7 @@ public class SyntheticBridgeException extends MixinException {
 
     private PrettyPrinter printProblem(PrettyPrinter printer, IMixinContext context, MethodNode mda, MethodNode mdb) {
         Type target = Type.getObjectType(context.getTargetClassRef());
+        MixinEnvironment environment = context.getMixin().getEnvironment();
         
         printer.add("Analysis").add();
         switch (this.problem) {
@@ -178,7 +180,7 @@ public class SyntheticBridgeException extends MixinException {
                         } else if (ta.getSort() != tb.getSort()) {
                             printer.kv("", "Types are incompatible");
                         } else if (ta.getSort() == Type.OBJECT) {
-                            ClassInfo superClass = ClassInfo.getCommonSuperClassOrInterface(ta, tb);
+                            ClassInfo superClass = ClassInfo.getCommonSuperClassOrInterface(environment, ta, tb);
                             printer.kv("", "Common supertype: %s", superClass);
                         }
                         
@@ -200,7 +202,7 @@ public class SyntheticBridgeException extends MixinException {
                 Type tb = Type.getObjectType(((TypeInsnNode)this.b).desc);
                 printer.kv("Target type", ta);
                 printer.kv("Incoming type", tb);
-                printer.kv("Common supertype", ClassInfo.getCommonSuperClassOrInterface(ta, tb)).add();
+                printer.kv("Common supertype", ClassInfo.getCommonSuperClassOrInterface(environment, ta, tb)).add();
                 break;
                 
             case BAD_INVOKE_NAME:
@@ -236,9 +238,9 @@ public class SyntheticBridgeException extends MixinException {
                 printer.add("be possible to adjust the generic types on implemented members to rectify this");
                 printer.add("problem by coalescing the appropriate generic types.").add();
                 
-                this.printTypeComparison(printer, "return type", rta, rtb);
+                this.printTypeComparison(environment, printer, "return type", rta, rtb);
                 for (int i = 0; i < arga.length; i++) {
-                    this.printTypeComparison(printer, "arg " + i, arga[i], argb[i]);
+                    this.printTypeComparison(environment, printer, "arg " + i, arga[i], argb[i]);
                 }
                 
                 break;
@@ -256,7 +258,7 @@ public class SyntheticBridgeException extends MixinException {
         return printer;
     }
 
-    private PrettyPrinter printTypeComparison(PrettyPrinter printer, String index, Type tpa, Type tpb) {
+    private PrettyPrinter printTypeComparison(MixinEnvironment environment, PrettyPrinter printer, String index, Type tpa, Type tpb) {
         printer.kv("Target " + index, "%s", tpa);
         printer.kv("Incoming " + index, "%s", tpb);
         
@@ -265,7 +267,7 @@ public class SyntheticBridgeException extends MixinException {
         } else if (tpa.getSort() != tpb.getSort()) {
             printer.kv("Analysis", "Types are incompatible");
         } else if (tpa.getSort() == Type.OBJECT) {
-            ClassInfo superClass = ClassInfo.getCommonSuperClassOrInterface(tpa, tpb);
+            ClassInfo superClass = ClassInfo.getCommonSuperClassOrInterface(environment, tpa, tpb);
             printer.kv("Analysis", "Common supertype: L%s;", superClass);
         }
         
