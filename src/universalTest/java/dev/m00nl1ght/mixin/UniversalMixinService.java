@@ -26,15 +26,15 @@ package dev.m00nl1ght.mixin;
 
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Closeables;
+import dev.m00nl1ght.clockwork.utils.logger.Logger;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.MixinEnvironment.CompatibilityLevel;
+import org.spongepowered.asm.mixin.ProfilerSection;
 import org.spongepowered.asm.mixin.transformer.MixinTransformer;
 import org.spongepowered.asm.service.*;
 import org.spongepowered.asm.transformers.MixinClassReader;
-import org.spongepowered.asm.util.perf.Profiler;
-import org.spongepowered.asm.util.perf.Profiler.Section;
 
 import java.io.File;
 import java.io.InputStream;
@@ -48,7 +48,6 @@ import java.util.Objects;
 /**
  * Mixin service that can be used for non-Minecraft applications
  */
-@SuppressWarnings({"DeprecatedIsStillUsed", "UnstableApiUsage"})
 public class UniversalMixinService extends MixinServiceAbstract implements IClassProvider, IClassBytecodeProvider, ITransformerProvider {
 
     public final File classSource = new File("./build/classes/java/universalTestExample/");
@@ -73,13 +72,13 @@ public class UniversalMixinService extends MixinServiceAbstract implements IClas
     }
 
     @Override
-    public boolean isValid() {
-        return true;
+    public CompatibilityLevel getMaxCompatibilityLevel() {
+        return CompatibilityLevel.JAVA_8;
     }
 
     @Override
-    public CompatibilityLevel getMaxCompatibilityLevel() {
-        return CompatibilityLevel.JAVA_8;
+    protected Logger createLogger(String name) {
+        return Logger.getLogger(name);
     }
 
     @Override
@@ -166,9 +165,7 @@ public class UniversalMixinService extends MixinServiceAbstract implements IClas
      * @param name class name
      * @param transformedName transformed class name
      * @return class bytes or null if not found
-     * @deprecated Use {@link #getClassNode} instead
      */
-    @Deprecated
     public byte[] getClassBytes(String name, String transformedName) {
         byte[] classBytes = classLoader.getClassBytes(name);
         if (classBytes != null) {
@@ -203,15 +200,13 @@ public class UniversalMixinService extends MixinServiceAbstract implements IClas
      * @return Transformed class bytecode for the specified class
      * @throws ClassNotFoundException if the specified class could not be loaded
      */
-    @Deprecated
     public byte[] getClassBytes(String className, boolean runTransformers) throws ClassNotFoundException {
         String transformedName = className.replace('/', '.');
         String name = transformedName;
-        
-        Profiler profiler = environment.getProfiler();
-        Section loadTime = profiler.begin(Profiler.ROOT, "class.load");
+
+        var timer = environment.profilerBegin();
         byte[] classBytes = this.getClassBytes(name, transformedName);
-        loadTime.end();
+        environment.profilerEnd(ProfilerSection.CLASS_LOAD, timer);
 
         if (classBytes == null) {
             throw new ClassNotFoundException(String.format("The specified class '%s' was not found", transformedName));

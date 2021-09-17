@@ -24,9 +24,12 @@
  */
 package org.spongepowered.asm.mixin;
 
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import dev.m00nl1ght.clockwork.utils.logger.Logger;
+import dev.m00nl1ght.clockwork.utils.profiler.AbstractProfilable;
+import dev.m00nl1ght.clockwork.utils.profiler.ProfilerEntry;
+import dev.m00nl1ght.clockwork.utils.profiler.ProfilerGroup;
+import dev.m00nl1ght.clockwork.utils.profiler.impl.FactoryProfilerGroup;
+import dev.m00nl1ght.clockwork.utils.profiler.impl.SimpleProfilerGroup;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.extensibility.IEnvironmentTokenProvider;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfig;
@@ -34,19 +37,15 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.InjectionPoint;
 import org.spongepowered.asm.mixin.injection.selectors.TargetSelector;
+import org.spongepowered.asm.mixin.injection.struct.InjectionInfo;
 import org.spongepowered.asm.mixin.transformer.ClassInfo;
-import org.spongepowered.asm.mixin.transformer.IMixinTransformer;
 import org.spongepowered.asm.obfuscation.RemapperChain;
 import org.spongepowered.asm.service.IMixinService;
-import org.spongepowered.asm.service.ITransformer;
-import org.spongepowered.asm.service.ITransformerProvider;
-import org.spongepowered.asm.service.MixinService;
 import org.spongepowered.asm.util.ITokenProvider;
 import org.spongepowered.asm.util.JavaVersion;
 import org.spongepowered.asm.util.LanguageFeatures;
 import org.spongepowered.asm.util.PrettyPrinter;
 import org.spongepowered.asm.util.asm.ASM;
-import org.spongepowered.asm.util.perf.Profiler;
 
 import java.util.*;
 
@@ -54,7 +53,7 @@ import java.util.*;
  * The mixin environment manages global state information for the mixin
  * subsystem.
  */
-public final class MixinEnvironment implements ITokenProvider {
+public final class MixinEnvironment extends AbstractProfilable<SimpleProfilerGroup, ProfilerSection> implements ITokenProvider {
 
     public static final String VERSION = "0.8.3";
 
@@ -814,7 +813,7 @@ public final class MixinEnvironment implements ITokenProvider {
         }
         
     }
-    
+
     /**
      * Wrapper for providing a natural sorting order for providers
      */
@@ -858,10 +857,6 @@ public final class MixinEnvironment implements ITokenProvider {
 
     private CompatibilityLevel compatibility;
 
-    private static final ILogger logger = MixinService.getService().getLogger("mixin");
-
-    private final Profiler profiler = new Profiler();
-
     private final IMixinService service;
 
     private final boolean[] options;
@@ -875,36 +870,39 @@ public final class MixinEnvironment implements ITokenProvider {
     private final RemapperChain remappers = new RemapperChain();
 
     private final List<IMixinConfig> configs = new ArrayList<>();
-    
-    /**
-     * Obfuscation context (refmap key to use in this environment) 
-     */
-    private String obfuscationContext = null;
 
     private final Set<String> errorHandlers = new LinkedHashSet<String>();
 
     private final ClassInfo.Cache classInfoCache = new ClassInfo.Cache(this);
 
-    private final InjectionPoint.Registry injectionPointRegistry = new InjectionPoint.Registry();
+    private final InjectionPoint.Registry injectionPointRegistry;
 
-    private final TargetSelector.Registry targetSelectorRegistry = new TargetSelector.Registry();
+    private final InjectionInfo.Registry injectionInfoRegistry;
+
+    private final TargetSelector.Registry targetSelectorRegistry;
     
     public MixinEnvironment(IMixinService service) {
+        super(ProfilerSection.class);
         this.service = Objects.requireNonNull(service);
+        this.injectionPointRegistry = new InjectionPoint.Registry(service);
+        this.injectionInfoRegistry = new InjectionInfo.Registry(service);
+        this.targetSelectorRegistry = new TargetSelector.Registry(service);
         
         this.options = new boolean[Option.values().length];
         for (Option option : Option.values()) {
             this.options[option.ordinal()] = option.getBooleanValue();
         }
 
-        profiler.setActive(getOption(Option.DEBUG_PROFILER));
+        if (getOption(Option.DEBUG_PROFILER)) {
+            this.attachDefaultProfiler();
+        }
     }
 
     public void printHeader() {
         String version = getVersion();
         String codeSource = this.getCodeSource();
         String serviceName = this.service.getName();
-        MixinEnvironment.logger.info("SpongePowered MIXIN Subsystem Version={} Source={} Service={}", version, codeSource, serviceName);
+        service.getLogger().info("SpongePowered MIXIN Subsystem Version={} Source={} Service={}", version, codeSource, serviceName);
         
         boolean verbose = this.getOption(Option.DEBUG_VERBOSE);
         if (verbose || this.getOption(Option.DEBUG_EXPORT) || this.getOption(Option.DEBUG_PROFILER)) {
@@ -918,7 +916,7 @@ public final class MixinEnvironment implements ITokenProvider {
             printer.kv("Detected ASM Supports Java", ASM.getClassVersionString()).hr();
             printer.kv("Service Name", serviceName);
             printer.kv("Mixin Service Class", this.service.getClass().getName());
-            printer.kv("Logger Adapter Type", MixinService.getService().getLogger("mixin").getType()).hr();
+            printer.kv("Logger Type", service.getLogger().getClass().getSimpleName()).hr();
             for (Option option : Option.values()) {
                 StringBuilder indent = new StringBuilder();
                 for (int i = 0; i < option.depth; i++) {
@@ -941,8 +939,8 @@ public final class MixinEnvironment implements ITokenProvider {
     /**
      * Get logging level info/debug based on verbose setting
      */
-    private Level getVerboseLoggingLevel() {
-        return this.getOption(Option.DEBUG_VERBOSE) ? Level.INFO : Level.DEBUG;
+    private Logger.Level getVerboseLoggingLevel() {
+        return this.getOption(Option.DEBUG_VERBOSE) ? Logger.Level.INFO : Logger.Level.DEBUG;
     }
 
     public List<IMixinConfig> getMixinConfigs() {
@@ -970,7 +968,7 @@ public final class MixinEnvironment implements ITokenProvider {
                 IEnvironmentTokenProvider provider = providerClass.getDeclaredConstructor().newInstance();
                 this.registerTokenProvider(provider);
             } catch (Throwable th) {
-                MixinEnvironment.logger.error("Error instantiating " + providerName, th);
+                service.getLogger().error("Error instantiating " + providerName, th);
             }
         }
         return this;
@@ -986,7 +984,7 @@ public final class MixinEnvironment implements ITokenProvider {
         if (provider != null && !this.tokenProviderClasses.contains(provider.getClass().getName())) {
             String providerName = provider.getClass().getName();
             TokenProviderWrapper wrapper = new TokenProviderWrapper(provider, this);
-            MixinEnvironment.logger.log(this.getVerboseLoggingLevel(), "Adding new token provider {} to {}", providerName, this);
+            service.getLogger().log(this.getVerboseLoggingLevel(), "Adding new token provider {} to {}", providerName, this);
             this.tokenProviders.add(wrapper);
             this.tokenProviderClasses.add(providerName);
             Collections.sort(this.tokenProviders);
@@ -1078,7 +1076,7 @@ public final class MixinEnvironment implements ITokenProvider {
 
     public CompatibilityLevel getCompatibilityLevel() {
         if (compatibility == null) {
-            CompatibilityLevel minLevel = MixinEnvironment.getMinCompatibilityLevel();
+            CompatibilityLevel minLevel = getMinCompatibilityLevel();
             CompatibilityLevel optionLevel = Option.DEFAULT_COMPATIBILITY_LEVEL.<CompatibilityLevel>getEnumValue(minLevel);
             compatibility = optionLevel.isAtLeast(minLevel) ? optionLevel : minLevel;
         }
@@ -1089,8 +1087,8 @@ public final class MixinEnvironment implements ITokenProvider {
      * Get the minimum (default) compatibility level supported by the current
      * service
      */
-    public static CompatibilityLevel getMinCompatibilityLevel() {
-        CompatibilityLevel minLevel = MixinService.getService().getMinCompatibilityLevel();
+    public CompatibilityLevel getMinCompatibilityLevel() {
+        CompatibilityLevel minLevel = service.getMinCompatibilityLevel();
         return minLevel == null ? CompatibilityLevel.DEFAULT : minLevel;
     }
     
@@ -1112,12 +1110,12 @@ public final class MixinEnvironment implements ITokenProvider {
 
             CompatibilityLevel maxLevel = service.getMaxCompatibilityLevel();
             if (maxLevel != null && maxLevel.isLessThan(level)) {
-                MixinEnvironment.logger.warn("The requested compatibility level {} is higher than the level supported by the active subsystem '{}'"
+                service.getLogger().warn("The requested compatibility level {} is higher than the level supported by the active subsystem '{}'"
                         + " which supports {}. This is not a supported configuration and instability may occur.", level, service.getName(), maxLevel);
             }
             
             compatibility = level;
-            MixinEnvironment.logger.info("Compatibility level set to {}", level);
+            service.getLogger().info("Compatibility level set to {}", level);
         }
     }
 
@@ -1125,15 +1123,8 @@ public final class MixinEnvironment implements ITokenProvider {
         return service;
     }
 
-    /**
-     * Get the performance profiler
-     * 
-     * @return profiler
-     * @deprecated use Profiler.getProfiler("mixin")
-     */
-    @Deprecated
-    public static Profiler getProfiler() {
-        return Profiler.getProfiler("mixin");
+    public Logger getLogger() {
+        return service.getLogger();
     }
 
     public void registerErrorHandlerClass(String handlerClassName) {
@@ -1154,8 +1145,27 @@ public final class MixinEnvironment implements ITokenProvider {
         return injectionPointRegistry;
     }
 
+    public InjectionInfo.Registry getInjectionInfoRegistry() {
+        return injectionInfoRegistry;
+    }
+
     public TargetSelector.Registry getTargetSelectorRegistry() {
         return targetSelectorRegistry;
+    }
+
+    @Override
+    public SimpleProfilerGroup attachDefaultProfiler() {
+        final var profiler = new FactoryProfilerGroup("mixin");
+        this.attachProfiler(profiler);
+        return profiler;
+    }
+
+    @Override
+    protected ProfilerEntry findProfilerEntry(SimpleProfilerGroup profiler, ProfilerSection entry) {
+        final var split = entry.name().toLowerCase(Locale.ROOT).split("_");
+        ProfilerGroup group = profiler;
+        for (int i = 0; i < split.length - 1; i++) group = group.getSubgroup(split[i]);
+        return group.getEntry(split[split.length - 1]);
     }
 
 }

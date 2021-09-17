@@ -24,11 +24,7 @@
  */
 package org.spongepowered.asm.mixin.injection.points;
 
-import java.util.Collection;
-import java.util.ListIterator;
-import java.util.Locale;
-
-import org.spongepowered.asm.logging.ILogger;
+import dev.m00nl1ght.clockwork.utils.logger.Logger;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.InsnList;
 import org.objectweb.asm.tree.MethodInsnNode;
@@ -39,13 +35,16 @@ import org.spongepowered.asm.mixin.injection.InjectionPoint;
 import org.spongepowered.asm.mixin.injection.InjectionPoint.AtCode;
 import org.spongepowered.asm.mixin.injection.selectors.ElementNode;
 import org.spongepowered.asm.mixin.injection.selectors.ITargetSelector;
-import org.spongepowered.asm.mixin.injection.selectors.ITargetSelectorByName;
 import org.spongepowered.asm.mixin.injection.selectors.ITargetSelector.Configure;
+import org.spongepowered.asm.mixin.injection.selectors.ITargetSelectorByName;
 import org.spongepowered.asm.mixin.injection.selectors.throwables.SelectorConstraintException;
 import org.spongepowered.asm.mixin.injection.struct.InjectionPointData;
 import org.spongepowered.asm.mixin.injection.struct.MemberInfo;
 import org.spongepowered.asm.mixin.refmap.IMixinContext;
-import org.spongepowered.asm.service.MixinService;
+
+import java.util.Collection;
+import java.util.ListIterator;
+import java.util.Locale;
 
 /**
  * <p>This injection point searches for INVOKEVIRTUAL, INVOKESTATIC and
@@ -108,21 +107,12 @@ public class BeforeInvoke extends InjectionPoint {
      * Class name (description) for debug logging
      */
     protected final String className;
-    
-    /**
-     * 
-     */
+
     protected final IInjectionPointContext context;
-    
-    /**
-     * 
-     */
+
     protected final IMixinContext mixin;
 
-    /**
-     * Logger reference 
-     */
-    protected final ILogger logger = MixinService.getService().getLogger("mixin");
+    protected final Logger logger;
 
     /**
      * True to turn on strategy debugging to the console
@@ -131,6 +121,7 @@ public class BeforeInvoke extends InjectionPoint {
 
     public BeforeInvoke(InjectionPointData data) {
         super(data);
+        this.logger = data.getMixin().getEnvironment().getLogger();
         
         this.target = data.getTarget();
         this.ordinal = data.getOrdinal();

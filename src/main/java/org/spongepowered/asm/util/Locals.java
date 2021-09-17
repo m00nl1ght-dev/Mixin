@@ -332,8 +332,8 @@ public final class Locals {
      * @return A sparse array containing a view (hopefully) of the locals at the
      *      specified location
      */
-    public static LocalVariableNode[] getLocalsAt(ClassNode classNode, MethodNode method, AbstractInsnNode node) {
-        return Locals.getLocalsAt(classNode, method, node, Settings.DEFAULT);
+    public static LocalVariableNode[] getLocalsAt(MixinEnvironment environment, ClassNode classNode, MethodNode method, AbstractInsnNode node) {
+        return Locals.getLocalsAt(environment, classNode, method, node, Settings.DEFAULT);
     }
     
     /**
@@ -379,7 +379,7 @@ public final class Locals {
      * @return A sparse array containing a view (hopefully) of the locals at the
      *      specified location
      */
-    public static LocalVariableNode[] getLocalsAt(ClassNode classNode, MethodNode method, AbstractInsnNode node, Settings settings) {
+    public static LocalVariableNode[] getLocalsAt(MixinEnvironment environment, ClassNode classNode, MethodNode method, AbstractInsnNode node, Settings settings) {
         for (int i = 0; i < 3 && (node instanceof LabelNode || node instanceof LineNumberNode); i++) {
             AbstractInsnNode nextNode = Locals.nextNode(method.instructions, node);
             if (nextNode instanceof FrameNode) { // Do not ffwd over frames
@@ -539,7 +539,7 @@ public final class Locals {
                 VarInsnNode varInsn = (VarInsnNode)insn;
                 boolean isLoad = insn.getOpcode() >= Opcodes.ILOAD && insn.getOpcode() <= Opcodes.SALOAD;
                 if (isLoad) {
-                    frame[varInsn.var] = Locals.getLocalVariableAt(classNode, method, insn, varInsn.var);
+                    frame[varInsn.var] = Locals.getLocalVariableAt(environment, classNode, method, insn, varInsn.var);
                     int varSize = frame[varInsn.var].desc != null ? Type.getType(frame[varInsn.var].desc).getSize() : 1;
                     knownFrameSize = Math.max(knownFrameSize, varInsn.var + varSize);
                     if (settings.hasFlags(Settings.RESURRECT_EXPOSED_ON_LOAD)) {

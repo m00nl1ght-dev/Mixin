@@ -24,11 +24,10 @@
  */
 package org.spongepowered.asm.mixin.transformer;
 
+import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import dev.m00nl1ght.clockwork.utils.logger.Logger;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 import org.spongepowered.asm.mixin.*;
@@ -37,15 +36,8 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
 import org.spongepowered.asm.mixin.transformer.ClassInfo.Member.Type;
 import org.spongepowered.asm.mixin.transformer.MixinInfo.MixinClassNode;
-import org.spongepowered.asm.service.MixinService;
-import org.spongepowered.asm.util.Annotations;
-import org.spongepowered.asm.util.Bytecode;
-import org.spongepowered.asm.util.ClassSignature;
-import org.spongepowered.asm.util.LanguageFeatures;
-import org.spongepowered.asm.util.Locals;
+import org.spongepowered.asm.util.*;
 import org.spongepowered.asm.util.asm.ClassNodeAdapter;
-import org.spongepowered.asm.util.perf.Profiler;
-import org.spongepowered.asm.util.perf.Profiler.Section;
 
 import java.util.*;
 
@@ -640,10 +632,6 @@ public final class ClassInfo {
             return "%s:%s";
         }
     }
-
-    private static final ILogger logger = MixinService.getService().getLogger("mixin");
-    
-    private static final Profiler profiler = Profiler.getProfiler("meta"); // TODO
     
     public static class Cache {
 
@@ -657,8 +645,6 @@ public final class ClassInfo {
         }
 
     }
-
-    private static final Logger logger = LogManager.getLogger("mixin");
 
     private static final String JAVA_LANG_OBJECT = "java/lang/Object";
 
@@ -815,7 +801,7 @@ public final class ClassInfo {
      * @param classNode Class node to inspect
      */
     private ClassInfo(MixinEnvironment environment, ClassNode classNode) {
-        Section timer = environment.getProfiler().begin(Profiler.ROOT, "class.meta");
+        var timer = environment.profilerBegin();
         try {
             this.environment = environment;
             this.name = classNode.name;
@@ -872,7 +858,7 @@ public final class ClassInfo {
             this.isInner = isInner;
             this.outerName = outerName;
 
-            if (MixinEnvironment.getCompatibilityLevel().supports(LanguageFeatures.NESTING)) {
+            if (environment.getCompatibilityLevel().supports(LanguageFeatures.NESTING)) {
                 this.nestHost = ClassNodeAdapter.getNestHostClass(classNode);
                 List<String> nestMembers = ClassNodeAdapter.getNestMembers(classNode);
                 if (nestMembers != null) {
@@ -881,7 +867,7 @@ public final class ClassInfo {
                 }
             }
         } finally {
-            timer.end();
+            environment.profilerEnd(ProfilerSection.CLASS_META, timer);
         }
     }
 
@@ -970,7 +956,7 @@ public final class ClassInfo {
         
         ClassInfo outer = this;
         while (outer != null && outer.outerName != null) {
-            outer = ClassInfo.forName(outer.outerName);
+            outer = ClassInfo.forName(environment, outer.outerName);
             if (outer != null && !outer.isPublic()) {
                 return false;
             }
@@ -1148,7 +1134,7 @@ public final class ClassInfo {
      */
     public ClassInfo resolveNestHost() {
         if (!Strings.isNullOrEmpty(this.nestHost)) {
-            return ClassInfo.forName(this.nestHost);
+            return ClassInfo.forName(environment, this.nestHost);
         }
         return this;
     }
@@ -1788,7 +1774,7 @@ public final class ClassInfo {
             for (String implemented : this.interfaces) {
                 ClassInfo iface = ClassInfo.forName(environment, implemented);
                 if (iface == null) {
-                    ClassInfo.logger.debug("Failed to resolve declared interface {} on {}", implemented, this.name);
+                    environment.getLogger().debug("Failed to resolve declared interface {} on {}", implemented, this.name);
                     continue;
 //                    throw new RuntimeException(new ClassNotFoundException(implemented));
                 }
@@ -1989,17 +1975,17 @@ public final class ClassInfo {
         ClassInfo info = environment.getClassInfoCache().classes.get(className);
         if (info == null) {
             try {
-                ClassNode classNode = MixinService.getService().getBytecodeProvider().getClassNode(className);
+                ClassNode classNode = environment.getService().getBytecodeProvider().getClassNode(className);
                 info = new ClassInfo(environment, classNode);
             } catch (Exception ex) {
-                ClassInfo.logger.catching(Level.TRACE, ex);
-                ClassInfo.logger.warn("Error loading class: {} ({}: {})", className, ex.getClass().getName(), ex.getMessage());
+                // environment.getService().getLogger().throwable(ex);
+                environment.getLogger().warn("Error loading class: {} ({}: {})", className, ex.getClass().getName(), ex.getMessage());
 //                ex.printStackTrace();
             }
 
             // Put null in the cache if load failed
             environment.getClassInfoCache().classes.put(className, info);
-            ClassInfo.logger.trace("Added class metadata for {} to metadata cache", className);
+            environment.getLogger().debug("Added class metadata for {} to metadata cache", className);
         }
 
         return info;
@@ -2019,7 +2005,7 @@ public final class ClassInfo {
         try {
             type = org.objectweb.asm.Type.getObjectType(descriptor);
         } catch (IllegalArgumentException ex) {
-            ClassInfo.logger.warn("Error resolving type from descriptor: {}", descriptor);
+            environment.getLogger().warn("Error resolving type from descriptor: {}", descriptor);
             return null;
         }
         return ClassInfo.forType(environment, type, lookup);
@@ -2097,7 +2083,7 @@ public final class ClassInfo {
         if (type1 == null || type2 == null) {
             return object(environment);
         }
-        return ClassInfo.getCommonSuperClass(ClassInfo.forName(environment, type1), ClassInfo.forName(environment, type2));
+        return ClassInfo.getCommonSuperClass(environment, ClassInfo.forName(environment, type1), ClassInfo.forName(environment, type2));
     }
     
     /**
@@ -2113,7 +2099,7 @@ public final class ClassInfo {
                 || type1.getSort() != org.objectweb.asm.Type.OBJECT || type2.getSort() != org.objectweb.asm.Type.OBJECT) {
             return object(environment);
         }
-        return ClassInfo.getCommonSuperClass(ClassInfo.forType(environment, type1, TypeLookup.DECLARED_TYPE), ClassInfo.forType(environment, type2, TypeLookup.DECLARED_TYPE));
+        return ClassInfo.getCommonSuperClass(environment, ClassInfo.forType(environment, type1, TypeLookup.DECLARED_TYPE), ClassInfo.forType(environment, type2, TypeLookup.DECLARED_TYPE));
     }
 
     /**
@@ -2124,9 +2110,9 @@ public final class ClassInfo {
      * @param type2 Second type
      * @return common superclass info
      */
-    private static ClassInfo getCommonSuperClass(ClassInfo type1, ClassInfo type2) {
+    private static ClassInfo getCommonSuperClass(MixinEnvironment environment, ClassInfo type1, ClassInfo type2) {
         if (type1 == null || type2 == null) {
-            return ClassInfo.OBJECT;
+            return object(environment);
         }
         return ClassInfo.getCommonSuperClass(type1, type2, false);
     }
@@ -2196,6 +2182,10 @@ public final class ClassInfo {
 
     private static ClassInfo object(MixinEnvironment environment) {
         return environment.getClassInfoCache().object;
+    }
+
+    public MixinEnvironment getEnvironment() {
+        return environment;
     }
 
 }

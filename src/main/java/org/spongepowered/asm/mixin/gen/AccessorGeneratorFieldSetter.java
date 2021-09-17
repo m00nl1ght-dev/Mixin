@@ -33,7 +33,6 @@ import org.spongepowered.asm.mixin.MixinEnvironment.Option;
 import org.spongepowered.asm.mixin.Mutable;
 import org.spongepowered.asm.mixin.transformer.ClassInfo.Method;
 import org.spongepowered.asm.mixin.transformer.MixinTargetContext;
-import org.spongepowered.asm.service.MixinService;
 import org.spongepowered.asm.util.Bytecode;
 
 /**
@@ -61,7 +60,7 @@ public class AccessorGeneratorFieldSetter extends AccessorGeneratorField {
         }
         
         if (this.info.getMixin().getOption(Option.DEBUG_VERBOSE)) {
-            MixinService.getService().getLogger("mixin").warn("{} for final field {}::{} is not @Mutable", this.info,
+            info.getMixin().getEnvironment().getLogger().warn("{} for final field {}::{} is not @Mutable", this.info,
                     ((MixinTargetContext)this.info.getMixin()).getTarget(), this.targetField.name);
         }                    
     }

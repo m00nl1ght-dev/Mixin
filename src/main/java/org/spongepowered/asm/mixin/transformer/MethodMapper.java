@@ -25,14 +25,11 @@
 package org.spongepowered.asm.mixin.transformer;
 
 import com.google.common.base.Strings;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.spongepowered.asm.mixin.injection.struct.InjectionInfo;
 import org.spongepowered.asm.mixin.transformer.ClassInfo.Method;
 import org.spongepowered.asm.mixin.transformer.MixinInfo.MixinMethodNode;
-import org.spongepowered.asm.service.MixinService;
 import org.spongepowered.asm.util.Counter;
 
 import java.util.ArrayList;
@@ -45,11 +42,6 @@ import java.util.Map;
  */
 class MethodMapper {
 
-    /**
-     * Logger
-     */
-    private static final ILogger logger = MixinService.getService().getLogger("mixin");
-    
     private static final List<String> classes = new ArrayList<String>();
     
     /**
@@ -86,7 +78,7 @@ class MethodMapper {
         }
         
         if (method.isUnique()) {
-            MethodMapper.logger.warn("Redundant @Unique on injector method {} in {}. Injectors are implicitly unique", method, mixin);
+            mixin.getEnvironment().getLogger().warn("Redundant @Unique on injector method {} in {}. Injectors are implicitly unique", method, mixin);
         }
         
         if (method.isRenamed()) {
@@ -105,7 +97,7 @@ class MethodMapper {
      * @return conformed handler name
      */
     public String getHandlerName(MixinMethodNode method) {
-        String prefix = InjectionInfo.getInjectorPrefix(method.getInjectorAnnotation());
+        String prefix = info.getEnvironment().getInjectionInfoRegistry().getInjectorPrefix(method.getInjectorAnnotation());
         String classUID = MethodMapper.getClassUID(method.getOwner().getClassRef());
         String methodUID = MethodMapper.getMethodUID(method.name, method.desc, !method.isSurrogate());
         return String.format("%s$%s%s$%s", prefix, classUID, methodUID, method.name);

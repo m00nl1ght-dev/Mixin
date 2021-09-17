@@ -82,7 +82,7 @@ public final class MixinTransformer extends TreeTransformer implements IMixinTra
         this.extensions = new Extensions(this.syntheticClassRegistry);
         
         this.hotSwapper = this.initHotSwapper(environment);
-        this.nestHostCoprocessor = new MixinCoprocessorNestHost();
+        this.nestHostCoprocessor = new MixinCoprocessorNestHost(environment);
 
         this.processor = new MixinProcessor(environment, this.extensions, this.hotSwapper, this.nestHostCoprocessor);
         this.generator = new MixinClassGenerator(environment, this.extensions);
@@ -96,14 +96,14 @@ public final class MixinTransformer extends TreeTransformer implements IMixinTra
         }
 
         try {
-            MixinProcessor.logger.info("Attempting to load Hot-Swap agent");
+            environment.getLogger().info("Attempting to load Hot-Swap agent");
             @SuppressWarnings("unchecked")
             Class<? extends IHotSwap> clazz =
                     (Class<? extends IHotSwap>)Class.forName(MixinTransformer.MIXIN_AGENT_CLASS);
             Constructor<? extends IHotSwap> ctor = clazz.getDeclaredConstructor(IMixinTransformer.class);
             return ctor.newInstance(this);
         } catch (Throwable th) {
-            MixinProcessor.logger.info("Hot-swap agent could not be loaded, hot swapping of mixins won't work. {}: {}",
+            environment.getLogger().info("Hot-swap agent could not be loaded, hot swapping of mixins won't work. {}: {}",
                     th.getClass().getSimpleName(), th.getMessage());
         }
 

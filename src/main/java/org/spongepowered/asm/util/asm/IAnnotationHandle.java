@@ -24,12 +24,10 @@
  */
 package org.spongepowered.asm.util.asm;
 
-import java.util.List;
-
-import javax.lang.model.type.TypeMirror;
-
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AnnotationNode;
+
+import java.util.List;
 
 /**
  * Interface for annotation handle since some classes may need to read info from

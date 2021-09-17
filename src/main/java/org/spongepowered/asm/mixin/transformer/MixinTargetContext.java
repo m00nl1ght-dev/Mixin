@@ -24,26 +24,13 @@
  */
 package org.spongepowered.asm.mixin.transformer;
 
-import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Deque;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-
-import org.spongepowered.asm.logging.Level;
-import org.spongepowered.asm.logging.ILogger;
+import com.google.common.collect.BiMap;
+import dev.m00nl1ght.clockwork.utils.logger.Logger;
 import org.objectweb.asm.ConstantDynamic;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
-import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.MixinEnvironment.CompatibilityLevel;
 import org.spongepowered.asm.mixin.MixinEnvironment.Option;
 import org.spongepowered.asm.mixin.Overwrite;
@@ -59,7 +46,6 @@ import org.spongepowered.asm.mixin.injection.throwables.InjectionValidationExcep
 import org.spongepowered.asm.mixin.injection.throwables.InvalidInjectionException;
 import org.spongepowered.asm.mixin.refmap.IMixinContext;
 import org.spongepowered.asm.mixin.refmap.IReferenceMapper;
-import org.spongepowered.asm.mixin.refmap.ReferenceMapper;
 import org.spongepowered.asm.mixin.struct.MemberRef;
 import org.spongepowered.asm.mixin.struct.SourceMap.File;
 import org.spongepowered.asm.mixin.throwables.ClassMetadataNotFoundException;
@@ -72,17 +58,14 @@ import org.spongepowered.asm.mixin.transformer.meta.MixinMerged;
 import org.spongepowered.asm.mixin.transformer.throwables.InvalidMixinException;
 import org.spongepowered.asm.mixin.transformer.throwables.MixinTransformerError;
 import org.spongepowered.asm.obfuscation.RemapperChain;
-import org.spongepowered.asm.service.MixinService;
-import org.spongepowered.asm.util.Annotations;
-import org.spongepowered.asm.util.Bytecode;
+import org.spongepowered.asm.util.*;
 import org.spongepowered.asm.util.Bytecode.Visibility;
-import org.spongepowered.asm.util.ClassSignature;
-import org.spongepowered.asm.util.Constants;
-import org.spongepowered.asm.util.LanguageFeatures;
 import org.spongepowered.asm.util.asm.ASM;
 import org.spongepowered.asm.util.asm.ClassNodeAdapter;
 
-import com.google.common.collect.BiMap;
+import java.lang.annotation.Annotation;
+import java.util.*;
+import java.util.Map.Entry;
 
 /**
  * This object keeps track of data for applying a mixin to a specific target
@@ -93,55 +76,23 @@ import com.google.common.collect.BiMap;
  * in the mixin to the appropriate members in the target class hierarchy. 
  */
 public class MixinTargetContext extends ClassContext implements IMixinContext {
-    
-    /**
-     * Logger
-     */
-    private static final ILogger logger = MixinService.getService().getLogger("mixin");
-    
-    /**
-     * Activity tracker
-     */
+
     protected final ActivityStack activities = new ActivityStack(null);
 
-    /**
-     * Mixin info
-     */
     private final MixinInfo mixin;
-    
-    /**
-     * Tree
-     */
+
     private final ClassNode classNode;
-    
-    /**
-     * 
-     */
+
     private final TargetClassContext targetClass;
-    
-    /**
-     * Session ID from context
-     */
+
     private final String sessionId;
-    
-    /**
-     * Target ClassInfo
-     */
+
     private final ClassInfo targetClassInfo;
-    
-    /**
-     * 
-     */
+
     private final BiMap<String, String> innerClasses;
 
-    /**
-     * Shadow method list
-     */
     private final List<MethodNode> shadowMethods = new ArrayList<MethodNode>();
 
-    /**
-     * Shadow field list
-     */
     private final Map<FieldNode, Field> shadowFields = new LinkedHashMap<FieldNode, Field>();
 
     /**
@@ -152,7 +103,7 @@ public class MixinTargetContext extends ClassContext implements IMixinContext {
     /**
      * Injector groups 
      */
-    private final InjectorGroupInfo.Map injectorGroups = new InjectorGroupInfo.Map();
+    private final InjectorGroupInfo.Map injectorGroups;
 
     /**
      * Injectors for this target 
@@ -197,6 +148,7 @@ public class MixinTargetContext extends ClassContext implements IMixinContext {
         this.classNode = classNode;
         this.targetClass = context;
         this.targetClassInfo = context.getClassInfo();
+        this.injectorGroups = new InjectorGroupInfo.Map(mixin.getEnvironment());
         this.stratum = context.getSourceMap().addFile(this.classNode);
         this.inheritsFromMixin = mixin.getClassInfo().hasMixinInHierarchy() || this.targetClassInfo.hasMixinTargetInHierarchy();
         this.detachedSuper = !this.classNode.superName.equals(this.getTarget().getClassNode().superName);
@@ -263,15 +215,6 @@ public class MixinTargetContext extends ClassContext implements IMixinContext {
     @Override
     public String toString() {
         return this.mixin.toString();
-    }
-    
-    /**
-     * Get the environment of the owning mixin config
-     * 
-     * @return mixin parent environment
-     */
-    public MixinEnvironment getEnvironment() {
-        return this.mixin.getEnvironment();
     }
     
     /* (non-Javadoc)
@@ -618,6 +561,7 @@ public class MixinTargetContext extends ClassContext implements IMixinContext {
     }
 
     private void checkFinal(MethodNode method, Iterator<AbstractInsnNode> iter, FieldInsnNode fieldNode) {
+        final Logger logger = mixin.getEnvironment().getLogger();
         if (!fieldNode.owner.equals(this.getTarget().getClassRef())) {
             return;
         }
@@ -636,13 +580,13 @@ public class MixinTargetContext extends ClassContext implements IMixinContext {
             if (shadowField.isDecoratedFinal()) {
                 if (shadowField.isDecoratedMutable()) {
                     if (this.mixin.getEnvironment().getOption(Option.DEBUG_VERBOSE)) {
-                        MixinTargetContext.logger.warn("Write access to @Mutable @Final field {} in {}::{}", shadowField, this.mixin, method.name);
+                        logger.warn("Write access to @Mutable @Final field {} in {}::{}", shadowField, this.mixin, method.name);
                     }                    
                 } else {
                     if (Constants.CTOR.equals(method.name) || Constants.CLINIT.equals(method.name)) {
-                        MixinTargetContext.logger.warn("@Final field {} in {} should be final", shadowField, this.mixin);
+                        logger.warn("@Final field {} in {} should be final", shadowField, this.mixin);
                     } else {
-                        MixinTargetContext.logger.error("Write access detected to @Final field {} in {}::{}", shadowField, this.mixin, method.name);
+                        logger.error("Write access detected to @Final field {} in {}::{}", shadowField, this.mixin, method.name);
                         if (this.mixin.getEnvironment().getOption(Option.DEBUG_VERIFY)) {
                             throw new InvalidMixinException(this.mixin, "Write access detected to @Final field " + shadowField + " in " + this.mixin
                                     + "::" + method.name);
@@ -1179,7 +1123,7 @@ public class MixinTargetContext extends ClassContext implements IMixinContext {
      * 
      * @return the logging level
      */
-    Level getLoggingLevel() {
+    Logger.Level getLoggingLevel() {
         return this.mixin.getLoggingLevel();
     }
 
@@ -1309,7 +1253,7 @@ public class MixinTargetContext extends ClassContext implements IMixinContext {
             for (MethodNode method : this.mergedMethods) {
                 prepareActivity.next("%s%s", method.name, method.desc);
                 IActivity methodActivity = this.activities.begin("Parse");
-                InjectionInfo injectInfo = InjectionInfo.parse(this, method);
+                InjectionInfo injectInfo = mixin.getEnvironment().getInjectionInfoRegistry().parse(this, method);
                 if (injectInfo == null) {
                     continue;
                 }

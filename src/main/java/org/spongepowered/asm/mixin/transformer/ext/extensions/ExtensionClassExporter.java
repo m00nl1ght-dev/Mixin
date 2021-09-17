@@ -27,20 +27,17 @@ package org.spongepowered.asm.mixin.transformer.ext.extensions;
 import com.google.common.io.Files;
 import com.google.common.io.MoreFiles;
 import com.google.common.io.RecursiveDeleteOption;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import dev.m00nl1ght.clockwork.utils.logger.Logger;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.MixinEnvironment.Option;
+import org.spongepowered.asm.mixin.ProfilerSection;
 import org.spongepowered.asm.mixin.transformer.ext.IDecompiler;
 import org.spongepowered.asm.mixin.transformer.ext.IExtension;
 import org.spongepowered.asm.mixin.transformer.ext.ITargetClassContext;
-import org.spongepowered.asm.service.MixinService;
 import org.spongepowered.asm.transformers.MixinClassWriter;
 import org.spongepowered.asm.util.Constants;
-import org.spongepowered.asm.util.perf.Profiler;
-import org.spongepowered.asm.util.perf.Profiler.Section;
 
 import java.io.File;
 import java.io.IOException;
@@ -58,10 +55,7 @@ public class ExtensionClassExporter implements IExtension {
     private static final String EXPORT_CLASS_DIR = "class";
     private static final String EXPORT_JAVA_DIR = "java";
 
-    /**
-     * Logger
-     */
-    private static final ILogger logger = MixinService.getService().getLogger("mixin");
+    private final Logger logger;
 
     /**
      * Directory to export classes to when debug.export is enabled
@@ -76,13 +70,14 @@ public class ExtensionClassExporter implements IExtension {
     private final MixinEnvironment environment;
     
     public ExtensionClassExporter(MixinEnvironment environment) {
-        this.environment = Objects.requireNonNull(environment);
+        this.logger = environment.getLogger();
+        this.environment = environment;
         this.decompiler = this.initDecompiler(environment, new File(Constants.DEBUG_OUTPUT_DIR, ExtensionClassExporter.EXPORT_JAVA_DIR));
 
         try {
             MoreFiles.deleteRecursively(this.classExportDir.toPath(), RecursiveDeleteOption.ALLOW_INSECURE);
         } catch (IOException ex) {
-            ExtensionClassExporter.logger.debug("Error cleaning class output directory: {}", ex.getMessage());
+            logger.debug("Error cleaning class output directory: {}", ex.getMessage());
         }
     }
     
@@ -97,17 +92,17 @@ public class ExtensionClassExporter implements IExtension {
         
         try {
             boolean as = env.getOption(Option.DEBUG_EXPORT_DECOMPILE_THREADED);
-            ExtensionClassExporter.logger.info("Attempting to load Fernflower decompiler{}", as ? " (Threaded mode)" : "");
+            logger.info("Attempting to load Fernflower decompiler{}", as ? " (Threaded mode)" : "");
             String className = ExtensionClassExporter.DECOMPILER_CLASS + (as ? "Async" : "");
             @SuppressWarnings("unchecked")
             Class<? extends IDecompiler> clazz = (Class<? extends IDecompiler>)Class.forName(className);
             Constructor<? extends IDecompiler> ctor = clazz.getDeclaredConstructor(File.class);
             IDecompiler decompiler = ctor.newInstance(outputPath);
-            ExtensionClassExporter.logger.info("Fernflower decompiler was successfully initialised from {}, exported classes will be decompiled{}",
+            logger.info("Fernflower decompiler was successfully initialised from {}, exported classes will be decompiled{}",
                     decompiler, as ? " in a separate thread" : "");
             return decompiler;
         } catch (Throwable th) {
-            ExtensionClassExporter.logger.info("Fernflower could not be loaded, exported classes will not be decompiled. {}: {}",
+            logger.info("Fernflower could not be loaded, exported classes will not be decompiled. {}: {}",
                     th.getClass().getSimpleName(), th.getMessage());
         }
         return null;
@@ -141,13 +136,14 @@ public class ExtensionClassExporter implements IExtension {
         if (force || env.getOption(Option.DEBUG_EXPORT)) {
             String filter = env.getOptionValue(Option.DEBUG_EXPORT_FILTER);
             if (force || filter == null || this.applyFilter(filter, name)) {
-                Section exportTimer = Profiler.getProfiler("export").begin("debug.export");
+                var timer = env.profilerBegin();
                 
                 File outputFile = this.dumpClass(name.replace('.', '/'), classNode);
                 if (this.decompiler != null) {
                     this.decompiler.decompile(outputFile);
                 }
-                exportTimer.end();
+
+                env.profilerEnd(ProfilerSection.DEBUG_EXPORT, timer);
             }
         }
     }
@@ -185,7 +181,7 @@ public class ExtensionClassExporter implements IExtension {
             // exporting for debugging purposes - is worthwhile so that we have a
             // the bytecode to inspect!
             if (computeFrames) {
-                ExtensionClassExporter.logger.warn("Exporting class {} with COMPUTE_FRAMES failed! Trying a raw export.", classNode.name);
+                logger.warn("Exporting class {} with COMPUTE_FRAMES failed! Trying a raw export.", classNode.name);
                 return getClassBytes(classNode, false);
             }
             ex.printStackTrace();

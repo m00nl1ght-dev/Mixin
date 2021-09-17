@@ -25,7 +25,10 @@
 package org.spongepowered.asm.mixin.transformer;
 
 import org.objectweb.asm.tree.ClassNode;
-import org.spongepowered.asm.mixin.transformer.MixinConfig.IListener;
+import org.spongepowered.asm.mixin.MixinEnvironment;
+import org.spongepowered.asm.mixin.extensibility.IMixinConfig;
+
+import java.util.Objects;
 
 /**
  * Coprocessors are parts of the mixin pipeline which aren't involved in
@@ -43,8 +46,14 @@ import org.spongepowered.asm.mixin.transformer.MixinConfig.IListener;
  * called <tt>MixinPostProcessor</tt>, but the mixture of responsibilities of
  * that class made its role unclear and slightly schizophrenic.</p>
  */
-abstract class MixinCoprocessor implements IListener {
-    
+abstract class MixinCoprocessor implements IMixinConfig.IListener {
+
+    protected final MixinEnvironment environment;
+
+    protected MixinCoprocessor(MixinEnvironment environment) {
+        this.environment = Objects.requireNonNull(environment);
+    }
+
     /**
      * The result of a specific coprocessor's action on a supplied class,
      * effectively a tuple of <tt>transformed</tt> and <tt>passthrough</tt>

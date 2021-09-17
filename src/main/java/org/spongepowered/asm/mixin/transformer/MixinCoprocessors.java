@@ -24,12 +24,12 @@
  */
 package org.spongepowered.asm.mixin.transformer;
 
-import java.util.ArrayList;
-
 import org.objectweb.asm.tree.ClassNode;
+import org.spongepowered.asm.mixin.MixinEnvironment;
+import org.spongepowered.asm.mixin.ProfilerSection;
 import org.spongepowered.asm.mixin.transformer.MixinCoprocessor.ProcessResult;
-import org.spongepowered.asm.util.perf.Profiler;
-import org.spongepowered.asm.util.perf.Profiler.Section;
+
+import java.util.ArrayList;
 
 /**
  * Convenience list of coprocessors
@@ -37,15 +37,6 @@ import org.spongepowered.asm.util.perf.Profiler.Section;
 class MixinCoprocessors extends ArrayList<MixinCoprocessor> {
 
     private static final long serialVersionUID = 1L;
-    
-    /**
-     * Profiler 
-     */
-    private final Profiler profiler;
-
-    MixinCoprocessors() {
-        this.profiler = Profiler.getProfiler("mixin");
-    }
 
     /**
      * Process the supplied class using all registered coprocessors. If the
@@ -57,13 +48,13 @@ class MixinCoprocessors extends ArrayList<MixinCoprocessor> {
      * @return result indicating whether the class was transformed, and whether
      *      or not to passthrough instead of apply mixins
      */
-    ProcessResult process(String className, ClassNode classNode) {
-        Section timer = this.profiler.begin("coprocessor");
+    ProcessResult process(MixinEnvironment environment, String className, ClassNode classNode) {
+        var timer = environment.profilerBegin();
         ProcessResult result = ProcessResult.NONE;
         for (MixinCoprocessor coprocessor : this) {
             result = coprocessor.process(className, classNode).with(result);
         }
-        timer.end();
+        environment.profilerEnd(ProfilerSection.COPROCESSOR_PROCESS, timer);
         return result;
     }
 
@@ -75,13 +66,13 @@ class MixinCoprocessors extends ArrayList<MixinCoprocessor> {
      * @param classNode Classnode of the target class
      * @return true if the coprocessor applied any transformations
      */
-    boolean postProcess(String className, ClassNode classNode) {
-        Section timer = this.profiler.begin("coprocessor");
+    boolean postProcess(MixinEnvironment environment, String className, ClassNode classNode) {
+        var timer = environment.profilerBegin();
         boolean transformed = false;
         for (MixinCoprocessor coprocessor : this) {
             transformed |= coprocessor.postProcess(className, classNode);
         }
-        timer.end();
+        environment.profilerEnd(ProfilerSection.COPROCESSOR_POSTPROCESS, timer);
         return transformed;
     }
     

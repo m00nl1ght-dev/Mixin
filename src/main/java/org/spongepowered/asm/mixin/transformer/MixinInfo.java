@@ -24,37 +24,15 @@
  */
 package org.spongepowered.asm.mixin.transformer;
 
-import java.io.IOException;
-import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-
-import org.spongepowered.asm.logging.Level;
-import org.spongepowered.asm.logging.ILogger;
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.Handle;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.AnnotationNode;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.FieldNode;
-import org.objectweb.asm.tree.InnerClassNode;
-import org.objectweb.asm.tree.InvokeDynamicInsnNode;
-import org.objectweb.asm.tree.MethodNode;
-import org.spongepowered.asm.mixin.Implements;
-import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.MixinEnvironment;
+import com.google.common.base.Functions;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import dev.m00nl1ght.clockwork.utils.logger.Logger;
+import org.objectweb.asm.*;
+import org.objectweb.asm.tree.*;
+import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.MixinEnvironment.CompatibilityLevel;
 import org.spongepowered.asm.mixin.MixinEnvironment.Option;
-import org.spongepowered.asm.mixin.Overwrite;
-import org.spongepowered.asm.mixin.Pseudo;
-import org.spongepowered.asm.mixin.Shadow;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfig;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
@@ -66,19 +44,15 @@ import org.spongepowered.asm.mixin.transformer.throwables.InvalidMixinException;
 import org.spongepowered.asm.mixin.transformer.throwables.MixinReloadException;
 import org.spongepowered.asm.mixin.transformer.throwables.MixinTargetAlreadyLoadedException;
 import org.spongepowered.asm.service.IClassTracker;
-import org.spongepowered.asm.service.IMixinService;
-import org.spongepowered.asm.service.MixinService;
 import org.spongepowered.asm.util.Annotations;
 import org.spongepowered.asm.util.Bytecode;
 import org.spongepowered.asm.util.LanguageFeatures;
 import org.spongepowered.asm.util.asm.ASM;
 import org.spongepowered.asm.util.asm.MethodNodeEx;
-import org.spongepowered.asm.util.perf.Profiler;
-import org.spongepowered.asm.util.perf.Profiler.Section;
 
-import com.google.common.base.Functions;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
+import java.io.IOException;
+import java.lang.annotation.Annotation;
+import java.util.*;
 
 /**
  * Runtime information bundle about a mixin
@@ -149,7 +123,7 @@ public class MixinInfo implements Comparable<MixinInfo>, IMixinInfo {
         }
 
         public AnnotationNode getInjectorAnnotation() {
-            return InjectionInfo.getInjectorAnnotation(MixinInfo.this, this);
+            return environment.getInjectionInfoRegistry().getInjectorAnnotation(MixinInfo.this, this);
         }
 
     }
@@ -731,11 +705,8 @@ public class MixinInfo implements Comparable<MixinInfo>, IMixinInfo {
      * with equivalent priority
      */
     static int mixinOrder = 0;
-    
-    /**
-     * Logger
-     */
-    private final transient ILogger logger = MixinService.getService().getLogger("mixin");
+
+    private final transient Logger logger;
     
     /**
      * Parent configuration which declares this mixin 
@@ -831,6 +802,7 @@ public class MixinInfo implements Comparable<MixinInfo>, IMixinInfo {
      */
     MixinInfo(MixinEnvironment environment, IMixinConfig parent, String name, IMixinConfigPlugin plugin, boolean ignorePlugin, Extensions extensions) {
         this.environment = environment;
+        this.logger = environment.getLogger();
         this.parent = parent;
         this.name = name;
         this.className = name;
@@ -969,10 +941,7 @@ public class MixinInfo implements Comparable<MixinInfo>, IMixinInfo {
      * @return true if the mixin should be a pplied
      */
     private boolean shouldApplyMixin(boolean ignorePlugin, String targetName) {
-        Section pluginTimer = getEnvironment().getProfiler().begin("plugin");
-        boolean result = ignorePlugin || this.plugin == null || this.plugin.shouldApplyMixin(targetName, this.className);
-        pluginTimer.end();
-        return result;
+        return ignorePlugin || this.plugin == null || this.plugin.shouldApplyMixin(targetName, this.className);
     }
 
     /**
@@ -1021,7 +990,7 @@ public class MixinInfo implements Comparable<MixinInfo>, IMixinInfo {
             this.logger.error(message);
             throw new InvalidMixinException(this, message);
         }
-        this.logger.log(verboseOnly && !this.parent.isVerboseLogging() ? Level.DEBUG : Level.WARN, message);
+        this.logger.log(verboseOnly && !this.parent.isVerboseLogging() ? Logger.Level.DEBUG : Logger.Level.WARN, message);
     }
 
     /**
@@ -1179,11 +1148,11 @@ public class MixinInfo implements Comparable<MixinInfo>, IMixinInfo {
     public boolean isRequired() {
         return this.parent.isRequired();
     }
-    
+
     /**
      * Get the logging level for this mixin
      */
-    public Level getLoggingLevel() {
+    public Logger.Level getLoggingLevel() {
         return this.parent.getLoggingLevel();
     }
 
@@ -1262,9 +1231,9 @@ public class MixinInfo implements Comparable<MixinInfo>, IMixinInfo {
      */
     MixinTargetContext createContextFor(TargetClassContext target) {
         MixinClassNode classNode = this.getClassNode(ClassReader.EXPAND_FRAMES);
-        Section preTimer = this.profiler.begin("pre");
+        var timer = environment.profilerBegin();
         MixinTargetContext context = this.type.createPreProcessor(classNode).prepare(this.extensions).createContextFor(target);
-        preTimer.end();
+        environment.profilerEnd(ProfilerSection.MIXIN_PRE, timer);
         return context;
     }
 
@@ -1328,13 +1297,8 @@ public class MixinInfo implements Comparable<MixinInfo>, IMixinInfo {
      * Called immediately before the mixin is applied to targetClass
      */
     public void preApply(String transformedName, ClassNode targetClass) throws Exception {
-        if (this.plugin.isAvailable()) {
-            Section pluginTimer = this.profiler.begin("plugin");
-            try {
-                this.plugin.preApply(transformedName, targetClass, this.className, this);
-            } finally {
-                pluginTimer.end();
-            }
+        if (this.plugin != null) {
+            this.plugin.preApply(transformedName, targetClass, this.className, this);
         }
     }
 
@@ -1342,13 +1306,8 @@ public class MixinInfo implements Comparable<MixinInfo>, IMixinInfo {
      * Called immediately after the mixin is applied to targetClass
      */
     public void postApply(String transformedName, ClassNode targetClass) throws Exception {
-        if (this.plugin.isAvailable()) {
-            Section pluginTimer = this.profiler.begin("plugin");
-            try {
-                this.plugin.postApply(transformedName, targetClass, this.className, this);
-            } finally {
-                pluginTimer.end();
-            }
+        if (this.plugin != null) {
+            this.plugin.postApply(transformedName, targetClass, this.className, this);
         }
 
         this.info.addAppliedMixin(this);

@@ -24,14 +24,14 @@
  */
 package org.spongepowered.asm.mixin.transformer;
 
-import java.util.Map.Entry;
-
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.spongepowered.asm.mixin.injection.struct.InjectionInfo;
 import org.spongepowered.asm.mixin.injection.throwables.InvalidInjectionException;
 import org.spongepowered.asm.mixin.transformer.ClassInfo.Field;
 import org.spongepowered.asm.mixin.transformer.throwables.InvalidInterfaceMixinException;
+
+import java.util.Map.Entry;
 
 /**
  * Applicator for interface mixins, mainly just disables things which aren't
@@ -99,7 +99,7 @@ class MixinApplicatorInterface extends MixinApplicatorStandard {
         // disabled for interface mixins
         for (MethodNode method : this.targetClass.methods) {
             try {
-                InjectionInfo injectInfo = InjectionInfo.parse(mixin, method);
+                InjectionInfo injectInfo = mixin.getEnvironment().getInjectionInfoRegistry().parse(mixin, method);
                 if (injectInfo != null) {
                     throw new InvalidInterfaceMixinException(mixin, injectInfo + " is not supported on interface mixin method " + method.name);
                 }

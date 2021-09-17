@@ -24,15 +24,9 @@
  */
 package org.spongepowered.asm.mixin.gen;
 
-import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
+import com.google.common.base.Joiner;
+import com.google.common.base.Strings;
+import com.google.common.collect.ImmutableSet;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
@@ -41,19 +35,19 @@ import org.spongepowered.asm.mixin.gen.throwables.InvalidAccessorException;
 import org.spongepowered.asm.mixin.injection.selectors.ElementNode;
 import org.spongepowered.asm.mixin.injection.selectors.ISelectorContext;
 import org.spongepowered.asm.mixin.injection.selectors.ITargetSelector;
-import org.spongepowered.asm.mixin.injection.selectors.TargetSelector;
 import org.spongepowered.asm.mixin.injection.selectors.ITargetSelector.Configure;
+import org.spongepowered.asm.mixin.injection.selectors.TargetSelector;
 import org.spongepowered.asm.mixin.injection.selectors.TargetSelector.Result;
 import org.spongepowered.asm.mixin.injection.struct.MemberInfo;
 import org.spongepowered.asm.mixin.struct.SpecialMethodInfo;
 import org.spongepowered.asm.mixin.transformer.MixinTargetContext;
-import org.spongepowered.asm.service.MixinService;
 import org.spongepowered.asm.util.Annotations;
 import org.spongepowered.asm.util.Bytecode;
 
-import com.google.common.base.Joiner;
-import com.google.common.base.Strings;
-import com.google.common.collect.ImmutableSet;
+import java.lang.annotation.Annotation;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Information about an accessor
@@ -400,7 +394,7 @@ public class AccessorInfo extends SpecialMethodInfo {
     public static String inflectTarget(AccessorName name, AccessorType type, String description, ISelectorContext context, boolean verbose) {
         if (name != null) {
             if (!type.isExpectedPrefix(name.prefix) && verbose) {
-                MixinService.getService().getLogger("mixin").warn("Unexpected prefix for {}, found [{}] expecting {}", description, name.prefix,
+                context.getMixin().getEnvironment().getLogger().warn("Unexpected prefix for {}, found [{}] expecting {}", description, name.prefix,
                         type.getExpectedPrefixes());
             }
             return TargetSelector.parseName(name.name, context);
@@ -493,7 +487,7 @@ public class AccessorInfo extends SpecialMethodInfo {
      */
     public MethodNode generate() {
         MethodNode generatedAccessor = this.generator.generate();
-        Annotations.merge(this.method, generatedAccessor);
+        Annotations.merge(mixin.getEnvironment(), this.method, generatedAccessor);
         return generatedAccessor;
     }
 

@@ -24,19 +24,13 @@
  */
 package org.spongepowered.asm.mixin.transformer;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.transformer.throwables.MixinTransformerError;
 import org.spongepowered.asm.util.LanguageFeatures;
 import org.spongepowered.asm.util.asm.ClassNodeAdapter;
+
+import java.util.*;
 
 /**
  * In Java 11 and above, access control semantics for inner members are reified
@@ -58,7 +52,8 @@ class MixinCoprocessorNestHost extends MixinCoprocessor {
      */
     private final Map<String, Set<String>> nestHosts = new HashMap<String, Set<String>>();
 
-    MixinCoprocessorNestHost() {
+    MixinCoprocessorNestHost(MixinEnvironment environment) {
+        super(environment);
     }
     
     void registerNestMember(String hostName, String memberName) {
@@ -81,7 +76,7 @@ class MixinCoprocessorNestHost extends MixinCoprocessor {
         }
         
         Set<String> newMembers = this.nestHosts.get(className);
-        if (!MixinEnvironment.getCompatibilityLevel().supports(LanguageFeatures.NESTING) || newMembers.isEmpty()) {
+        if (!environment.getCompatibilityLevel().supports(LanguageFeatures.NESTING) || newMembers.isEmpty()) {
             return false;
         }
         

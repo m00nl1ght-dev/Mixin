@@ -24,23 +24,7 @@
  */
 package org.spongepowered.asm.mixin.injection.selectors;
 
-import java.lang.annotation.Annotation;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import javax.tools.Diagnostic.Kind;
-
+import com.google.common.base.Strings;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.spongepowered.asm.mixin.MixinEnvironment;
@@ -51,11 +35,17 @@ import org.spongepowered.asm.mixin.injection.selectors.throwables.SelectorConstr
 import org.spongepowered.asm.mixin.injection.struct.MemberInfo;
 import org.spongepowered.asm.mixin.throwables.MixinError;
 import org.spongepowered.asm.mixin.throwables.MixinException;
+import org.spongepowered.asm.service.IMixinService;
 import org.spongepowered.asm.util.Annotations;
 import org.spongepowered.asm.util.asm.IAnnotationHandle;
-import org.spongepowered.asm.util.logging.MessageRouter;
 
-import com.google.common.base.Strings;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Utility class for parsing selectors
@@ -188,7 +178,10 @@ public final class TargetSelector {
 
         private final Map<String, DynamicSelectorEntry> dynamicSelectors = new LinkedHashMap<>();
 
-        public Registry() {
+        private final IMixinService mixinService;
+
+        public Registry(IMixinService mixinService) {
+            this.mixinService = Objects.requireNonNull(mixinService);
             this.registerBuiltIn(DynamicSelectorDesc.class);
         }
 
@@ -231,11 +224,10 @@ public final class TargetSelector {
 
             DynamicSelectorEntry existing = this.dynamicSelectors.get(code);
             if (existing != null) { // && !existing.type.equals(type)) {
-                MessageRouter.getMessager().printMessage(Kind.WARNING, String.format("Overriding target selector for @%s with %s (previously %s)",
-                        code, type.getName(), existing.type.getName()));
+                mixinService.getLogger().warn("Overriding target selector for @{} with {} (previously {})",
+                        code, type.getName(), existing.type.getName());
             } else {
-                MessageRouter.getMessager().printMessage(Kind.OTHER, String.format("Registering new target selector for @%s with %s",
-                        code, type.getName()));
+                mixinService.getLogger().warn("Registering new target selector for @{} with {}", code, type.getName());
             }
 
             this.dynamicSelectors.put(code, entry);

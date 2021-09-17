@@ -25,7 +25,6 @@
 package dev.m00nl1ght.mixin;
 
 import org.spongepowered.asm.mixin.transformer.MixinConfig;
-import org.spongepowered.asm.service.MixinService;
 
 import java.util.Collections;
 
@@ -45,7 +44,7 @@ public final class UniversalTest {
      */
     public static void main(String[] args) throws Exception {
 
-        final UniversalMixinService service = (UniversalMixinService) MixinService.getService();
+        final UniversalMixinService service = new UniversalMixinService();
         service.init();
 
         service.getClassLoader().addExcludedPackage("dev.m00nl1ght.mixin.example.mixins");

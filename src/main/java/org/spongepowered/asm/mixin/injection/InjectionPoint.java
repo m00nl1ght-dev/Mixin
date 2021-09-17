@@ -28,7 +28,6 @@ import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableList.Builder;
-import org.apache.logging.log4j.LogManager;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.InsnList;
@@ -45,7 +44,7 @@ import org.spongepowered.asm.mixin.injection.throwables.InvalidInjectionExceptio
 import org.spongepowered.asm.mixin.refmap.IMixinContext;
 import org.spongepowered.asm.mixin.struct.AnnotatedMethodInfo;
 import org.spongepowered.asm.mixin.transformer.MixinTargetContext;
-import org.spongepowered.asm.service.MixinService;
+import org.spongepowered.asm.service.IMixinService;
 import org.spongepowered.asm.util.Annotations;
 import org.spongepowered.asm.util.IMessageSink;
 
@@ -239,8 +238,10 @@ public abstract class InjectionPoint {
 
         private final Map<String, Class<? extends InjectionPoint>> types = new HashMap<>();
 
-        public Registry() {
-            // Standard Injection Points
+        private final IMixinService mixinService;
+
+        public Registry(IMixinService mixinService) {
+            this.mixinService = Objects.requireNonNull(mixinService);
             registerBuiltIn(BeforeFieldAccess.class);
             registerBuiltIn(BeforeInvoke.class);
             registerBuiltIn(BeforeNew.class);
@@ -275,10 +276,10 @@ public abstract class InjectionPoint {
 
             Class<? extends InjectionPoint> existing = this.types.get(code.value());
             if (existing != null && !existing.equals(type)) {
-                MixinService.getService().getLogger("mixin").debug("Overriding InjectionPoint {} with {} (previously {})", code.value(), type.getName(),
+                mixinService.getLogger().debug("Overriding InjectionPoint {} with {} (previously {})", code.value(), type.getName(),
                         existing.getName());
             } else if (Strings.isNullOrEmpty(namespace)) {
-                MixinService.getService().getLogger("mixin").warn("Registration of InjectionPoint {} with {} without specifying namespace is deprecated.",
+                mixinService.getLogger().warn("Registration of InjectionPoint {} with {} without specifying namespace is deprecated.",
                         code.value(), type.getName());
             }
 
@@ -309,7 +310,7 @@ public abstract class InjectionPoint {
             if (ipClass == null) {
                 if (type.matches("^([A-Za-z_][A-Za-z0-9_]*[\\.\\$])+[A-Za-z_][A-Za-z0-9_]*$")) {
                     try {
-                        ipClass = (Class<? extends InjectionPoint>)MixinService.getService().getClassProvider().findClass(type);
+                        ipClass = (Class<? extends InjectionPoint>) mixinService.getClassProvider().findClass(type);
                         this.types.put(type, ipClass);
                     } catch (Exception ex) {
                         throw new InvalidInjectionException(context, data + " could not be loaded or is not a valid InjectionPoint", ex);
@@ -588,7 +589,7 @@ public abstract class InjectionPoint {
                     int absShift = Math.abs(this.shift);
                     char operator = absShift != this.shift ? '-' : '+';
                     this.input.addMessage(
-                            "@At.shift offset outside the target bounds: Index (index(%d) %s offset(%d) = %d) is outside the allowed range (0-%d)",
+                            "@At.shift offset outside the target bounds: Index (index({}) {} offset({}) = {}) is outside the allowed range (0-{})",
                             sourceIndex, operator, absShift, newIndex, insns.size());
                 }
             }
@@ -883,11 +884,11 @@ public abstract class InjectionPoint {
             allowed = InjectionPoint.MAX_ALLOWED_SHIFT_BY; 
         }
         
-        String message = String.format("@%s(%s) Shift.BY=%d on %s::%s exceeds %s%d. %s", Annotations.getSimpleName(parent), point,
+        String message = String.format("@{}({}) Shift.BY={} on {}::{} exceeds {}{}. {}", Annotations.getSimpleName(parent), point,
                 by, context, method.name, limitBreached, allowed, advice);
         
         if (err == ShiftByViolationBehaviour.WARN && allowed < InjectionPoint.MAX_ALLOWED_SHIFT_BY) {
-            MixinService.getService().getLogger("mixin").warn(message);
+            context.getEnvironment().getLogger().warn(message);
             return;
         }
 

@@ -24,9 +24,9 @@
  */
 package org.spongepowered.asm.util;
 
-import java.io.File;
-
 import org.spongepowered.asm.mixin.Mixin;
+
+import java.io.File;
 
 /**
  * Miscellaneous shared constants
@@ -52,11 +52,6 @@ public abstract class Constants {
     public static final char UNICODE_SNOWMAN = '\u2603';
     
     public static final File DEBUG_OUTPUT_DIR = new File(Constants.DEBUG_OUTPUT_PATH);
-    
-    public static final String SIDE_DEDICATEDSERVER = "DEDICATEDSERVER";
-    public static final String SIDE_SERVER = "SERVER";
-    public static final String SIDE_CLIENT = "CLIENT";
-    public static final String SIDE_UNKNOWN = "UNKNOWN";
     
     private Constants() {}
     

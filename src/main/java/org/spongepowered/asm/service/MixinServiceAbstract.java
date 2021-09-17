@@ -24,53 +24,31 @@
  */
 package org.spongepowered.asm.service;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import dev.m00nl1ght.clockwork.utils.logger.Logger;
 import org.spongepowered.asm.mixin.MixinEnvironment.CompatibilityLevel;
 import org.spongepowered.asm.util.Constants;
-import org.spongepowered.asm.util.IConsumer;
 import org.spongepowered.asm.util.ReEntranceLock;
 
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableList.Builder;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Mixin Service base class
  */
 public abstract class MixinServiceAbstract implements IMixinService {
 
-    /**
-     * Logger adapter, replacement for log4j2 logger as services should use
-     * their own loggers now in order to avoid contamination
-     */
-    private static ILogger logger;
+    private final Logger mainLogger;
 
-    /**
-     * Cached logger adapters 
-     */
-    private static final Map<String, ILogger> loggers = new HashMap<String, ILogger>();
+    private final Map<String, Logger> loggers = new HashMap<String, Logger>();
 
     /**
      * Transformer re-entrance lock, shared between the mixin transformer and
      * the metadata service
      */
     protected final ReEntranceLock lock = new ReEntranceLock(1);
-
-    /**
-     * Detected side name
-     */
-    private String sideName;
     
     protected MixinServiceAbstract() {
-        if (MixinServiceAbstract.logger == null) {
-            MixinServiceAbstract.logger = this.getLogger("mixin");
-        }
+        mainLogger = this.getLogger("mixin");
     }
     
     /* (non-Javadoc)
@@ -99,29 +77,20 @@ public abstract class MixinServiceAbstract implements IMixinService {
         return this.lock;
     }
 
-    /* (non-Javadoc)
-     * @see org.spongepowered.asm.service.IMixinService#getSideName()
-     */
     @Override
-    public final String getSideName() {
-        if (this.sideName != null) {
-            return this.sideName;
-        }
-        
-        return Constants.SIDE_UNKNOWN;
-    }
-
-    @Override
-    public synchronized ILogger getLogger(final String name) {
-        ILogger logger = MixinServiceAbstract.loggers.get(name);
+    public synchronized Logger getLogger(final String name) {
+        Logger logger = loggers.get(name);
         if (logger == null) {
-            MixinServiceAbstract.loggers.put(name, logger = this.createLogger(name));
+            loggers.put(name, logger = this.createLogger(name));
         }
         return logger;
     }
 
-    protected ILogger createLogger(final String name) {
-        return new LoggerAdapterDefault(name);
+    @Override
+    public Logger getLogger() {
+        return mainLogger;
     }
+
+    protected abstract Logger createLogger(final String name);
 
 }

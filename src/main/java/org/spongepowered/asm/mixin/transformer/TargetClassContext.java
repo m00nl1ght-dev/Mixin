@@ -24,8 +24,6 @@
  */
 package org.spongepowered.asm.mixin.transformer;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
@@ -33,18 +31,16 @@ import org.objectweb.asm.tree.MethodNode;
 import org.spongepowered.asm.mixin.Debug;
 import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.MixinEnvironment.Option;
+import org.spongepowered.asm.mixin.ProfilerSection;
 import org.spongepowered.asm.mixin.injection.struct.Target;
 import org.spongepowered.asm.mixin.struct.SourceMap;
 import org.spongepowered.asm.mixin.transformer.ext.Extensions;
 import org.spongepowered.asm.mixin.transformer.ext.ITargetClassContext;
 import org.spongepowered.asm.mixin.transformer.ext.extensions.ExtensionCheckClass.ValidationFailedException;
 import org.spongepowered.asm.mixin.transformer.throwables.InvalidMixinException;
-import org.spongepowered.asm.service.MixinService;
 import org.spongepowered.asm.util.Annotations;
 import org.spongepowered.asm.util.Bytecode;
 import org.spongepowered.asm.util.ClassSignature;
-import org.spongepowered.asm.util.perf.Profiler;
-import org.spongepowered.asm.util.perf.Profiler.Section;
 
 import java.util.*;
 
@@ -52,11 +48,6 @@ import java.util.*;
  * Struct for containing target class information during mixin application
  */
 final class TargetClassContext extends ClassContext implements ITargetClassContext {
-
-    /**
-     * Logger
-     */
-    private static final ILogger logger = MixinService.getService().getLogger("mixin");
 
     /**
      * Mixin environment
@@ -67,11 +58,6 @@ final class TargetClassContext extends ClassContext implements ITargetClassConte
      * Mixin transformer extensions
      */
     private final Extensions extensions;
-    
-    /**
-     * Profiler 
-     */
-    private final Profiler profiler;
 
     /**
      * Transformer session ID
@@ -147,7 +133,6 @@ final class TargetClassContext extends ClassContext implements ITargetClassConte
     TargetClassContext(MixinEnvironment environment, Extensions extensions, String sessionId, String name, ClassNode classNode, SortedSet<MixinInfo> mixins) {
         this.environment = environment;
         this.extensions = extensions;
-        this.profiler = Profiler.getProfiler("mixin");
         this.sessionId = sessionId;
         this.className = name;
         this.classNode = classNode;
@@ -268,7 +253,7 @@ final class TargetClassContext extends ClassContext implements ITargetClassConte
 
     void methodMerged(MethodNode method) {
         if (!this.mixinMethods.remove(method)) {
-            TargetClassContext.logger.debug("Unexpected: Merged unregistered method {}{} in {}", method.name, method.desc, this);
+            environment.getLogger().debug("Unexpected: Merged unregistered method {}{} in {}", method.name, method.desc, this);
         }
     }
     
@@ -353,13 +338,13 @@ final class TargetClassContext extends ClassContext implements ITargetClassConte
             throw new IllegalStateException("Mixins already applied to target class " + this.className);
         }
         this.applied = true;
-        Section timer = this.profiler.begin("preapply");
+        var timer = environment.profilerBegin();
         this.preApply();
-        timer = timer.next("apply");
+        timer = environment.profilerNext(ProfilerSection.CLASS_PREAPPLY, timer);
         this.apply();
-        timer = timer.next("postapply");
+        timer = environment.profilerNext(ProfilerSection.CLASS_APPLY, timer);
         this.postApply();
-        timer.end();
+        environment.profilerEnd(ProfilerSection.CLASS_POSTAPPLY, timer);
     }
     
     /**
@@ -388,9 +373,9 @@ final class TargetClassContext extends ClassContext implements ITargetClassConte
             this.extensions.postApply(this);
             this.export = true;
         } catch (ValidationFailedException ex) {
-            MixinProcessor.logger.info(ex.getMessage());
+            environment.getLogger().info(ex.getMessage());
             // If verify is enabled and failed, write out the bytecode to allow us to inspect it
-            this.export |= this.forceExport || this.env.getOption(Option.DEBUG_EXPORT);
+            this.export |= this.forceExport || this.environment.getOption(Option.DEBUG_EXPORT);
         }
     }
 
@@ -408,7 +393,7 @@ final class TargetClassContext extends ClassContext implements ITargetClassConte
     private void checkMerges() {
         for (MethodNode method : this.mixinMethods) {
             if (!method.name.startsWith("<")) {
-                TargetClassContext.logger.debug("Unexpected: Registered method {}{} in {} was not merged", method.name, method.desc, this);
+                environment.getLogger().debug("Unexpected: Registered method {}{} in {} was not merged", method.name, method.desc, this);
             }
         }
     }

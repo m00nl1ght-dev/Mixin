@@ -24,10 +24,11 @@
  */
 package org.spongepowered.asm.mixin.transformer;
 
+import org.objectweb.asm.tree.ClassNode;
+import org.spongepowered.asm.mixin.MixinEnvironment;
+
 import java.util.HashSet;
 import java.util.Set;
-
-import org.objectweb.asm.tree.ClassNode;
 
 /**
  * Passthrough coprocessor which simply keeps track of classes which are
@@ -40,7 +41,8 @@ class MixinCoprocessorPassthrough extends MixinCoprocessor {
      */
     private final Set<String> loadable = new HashSet<String>();
 
-    MixinCoprocessorPassthrough() {
+    MixinCoprocessorPassthrough(MixinEnvironment environment) {
+        super(environment);
     }
     
     @Override

@@ -22,8 +22,30 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+package org.spongepowered.asm.mixin;
+
+import org.spongepowered.asm.mixin.throwables.MixinError;
 
 /**
- * Performance profiling for Mixin.
+ * Error raised when mixin subsystem initialisation fails
  */
-package org.spongepowered.asm.util.perf;
+public class MixinInitialisationError extends MixinError {
+
+    private static final long serialVersionUID = 1L;
+
+    public MixinInitialisationError() {
+    }
+
+    public MixinInitialisationError(String message) {
+        super(message);
+    }
+
+    public MixinInitialisationError(Throwable cause) {
+        super(cause);
+    }
+
+    public MixinInitialisationError(String message, Throwable cause) {
+        super(message, cause);
+    }
+
+}

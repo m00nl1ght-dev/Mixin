@@ -31,11 +31,7 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
-import javax.tools.Diagnostic.Kind;
-
 import org.spongepowered.asm.service.IMixinService;
-import org.spongepowered.asm.service.MixinService;
-import org.spongepowered.asm.util.logging.MessageRouter;
 
 import com.google.common.collect.Maps;
 import com.google.common.io.Closeables;

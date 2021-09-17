@@ -24,12 +24,17 @@
  */
 package org.spongepowered.asm.util.asm;
 
-import java.lang.reflect.Field;
-import java.util.jar.Attributes;
-
 import org.objectweb.asm.Opcodes;
-import org.spongepowered.asm.launch.platform.MainAttributes;
 import org.spongepowered.asm.util.VersionNumber;
+
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Field;
+import java.net.URL;
+import java.nio.file.Path;
+import java.util.jar.Attributes;
+import java.util.jar.JarFile;
+import java.util.jar.Manifest;
 
 /**
  * Utility methods for determining ASM version and other version-specific
@@ -216,11 +221,22 @@ public final class ASM {
         }
         
         try {
-            MainAttributes manifest = MainAttributes.of(clazz.getProtectionDomain().getCodeSource().getLocation().toURI());
-            return VersionNumber.parse(manifest.get(Attributes.Name.IMPLEMENTATION_VERSION));
+            URL location = clazz.getProtectionDomain().getCodeSource().getLocation();
+            Attributes manifest = getJarAttributes(new File(location.toURI()));
+            return VersionNumber.parse(manifest.getValue(Attributes.Name.IMPLEMENTATION_VERSION));
         } catch (Exception ex) {
             return VersionNumber.NONE;
         }
+    }
+
+    private static Attributes getJarAttributes(File jar) {
+        try (JarFile jarFile = new JarFile(jar)) {
+            Manifest manifest = jarFile.getManifest();
+            if (manifest != null) {
+                return manifest.getMainAttributes();
+            }
+        } catch (IOException ex) {}
+        return null;
     }
 
 }

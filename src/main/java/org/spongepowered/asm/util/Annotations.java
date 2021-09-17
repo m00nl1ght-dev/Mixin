@@ -37,11 +37,7 @@ import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
-import org.spongepowered.asm.mixin.Debug;
-import org.spongepowered.asm.mixin.Final;
-import org.spongepowered.asm.mixin.Intrinsic;
-import org.spongepowered.asm.mixin.Overwrite;
-import org.spongepowered.asm.service.MixinService;
+import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.util.asm.IAnnotationHandle;
 
 import com.google.common.base.Function;
@@ -683,9 +679,9 @@ public final class Annotations {
      * @param from ClassNode to merge annotations from
      * @param to ClassNode to merge annotations to
      */
-    public static void merge(ClassNode from, ClassNode to) {
-        to.visibleAnnotations = Annotations.merge(from.visibleAnnotations, to.visibleAnnotations, "class", from.name);
-        to.invisibleAnnotations = Annotations.merge(from.invisibleAnnotations, to.invisibleAnnotations, "class", from.name);
+    public static void merge(MixinEnvironment environment, ClassNode from, ClassNode to) {
+        to.visibleAnnotations = Annotations.merge(environment, from.visibleAnnotations, to.visibleAnnotations, "class", from.name);
+        to.invisibleAnnotations = Annotations.merge(environment, from.invisibleAnnotations, to.invisibleAnnotations, "class", from.name);
     }
         
     /**
@@ -699,9 +695,9 @@ public final class Annotations {
      * @param from MethodNode to merge annotations from
      * @param to MethodNode to merge annotations to
      */
-    public static void merge(MethodNode from, MethodNode to) {
-        to.visibleAnnotations = Annotations.merge(from.visibleAnnotations, to.visibleAnnotations, "method", from.name);
-        to.invisibleAnnotations = Annotations.merge(from.invisibleAnnotations, to.invisibleAnnotations, "method", from.name);
+    public static void merge(MixinEnvironment environment, MethodNode from, MethodNode to) {
+        to.visibleAnnotations = Annotations.merge(environment, from.visibleAnnotations, to.visibleAnnotations, "method", from.name);
+        to.invisibleAnnotations = Annotations.merge(environment, from.invisibleAnnotations, to.invisibleAnnotations, "method", from.name);
     }
     
     /**
@@ -715,9 +711,9 @@ public final class Annotations {
      * @param from FieldNode to merge annotations from
      * @param to FieldNode to merge annotations to
      */
-    public static void merge(FieldNode from, FieldNode to) {
-        to.visibleAnnotations = Annotations.merge(from.visibleAnnotations, to.visibleAnnotations, "field", from.name);
-        to.invisibleAnnotations = Annotations.merge(from.invisibleAnnotations, to.invisibleAnnotations, "field", from.name);
+    public static void merge(MixinEnvironment environment, FieldNode from, FieldNode to) {
+        to.visibleAnnotations = Annotations.merge(environment, from.visibleAnnotations, to.visibleAnnotations, "field", from.name);
+        to.invisibleAnnotations = Annotations.merge(environment, from.invisibleAnnotations, to.invisibleAnnotations, "field", from.name);
     }
     
     /**
@@ -730,7 +726,7 @@ public final class Annotations {
      * @param name Name of the item being merged, for debugging purposes
      * @return The merged list (or a new list if the target list was null)
      */
-    private static List<AnnotationNode> merge(List<AnnotationNode> from, List<AnnotationNode> to, String type, String name) {
+    private static List<AnnotationNode> merge(MixinEnvironment environment, List<AnnotationNode> from, List<AnnotationNode> to, String type, String name) {
         try {
             if (from == null) {
                 return to;
@@ -755,7 +751,7 @@ public final class Annotations {
                 to.add(annotation);
             }
         } catch (Exception ex) {
-            MixinService.getService().getLogger("mixin").warn("Exception encountered whilst merging annotations for {} {}", type, name);
+            environment.getLogger().warn("Exception encountered whilst merging annotations for {} {}", type, name);
         }
         
         return to;

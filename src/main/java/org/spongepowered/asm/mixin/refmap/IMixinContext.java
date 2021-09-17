@@ -24,6 +24,7 @@
  */
 package org.spongepowered.asm.mixin.refmap;
 
+import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.MixinEnvironment.Option;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 import org.spongepowered.asm.mixin.transformer.ext.Extensions;
@@ -84,5 +85,9 @@ public interface IMixinContext {
      * Get the priority of the mixin
      */
     public abstract int getPriority();
+
+    public default MixinEnvironment getEnvironment() {
+        return getMixin().getEnvironment();
+    }
 
 }

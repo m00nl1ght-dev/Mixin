@@ -25,19 +25,15 @@
 package org.spongepowered.asm.mixin.transformer;
 
 import com.google.common.collect.ImmutableList;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import dev.m00nl1ght.clockwork.utils.logger.Logger;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.signature.SignatureReader;
 import org.objectweb.asm.signature.SignatureVisitor;
 import org.objectweb.asm.tree.*;
-import org.spongepowered.asm.mixin.Final;
-import org.spongepowered.asm.mixin.Intrinsic;
-import org.spongepowered.asm.mixin.MixinEnvironment;
+import org.spongepowered.asm.mixin.*;
 import org.spongepowered.asm.mixin.MixinEnvironment.Option;
-import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.extensibility.IActivityContext.IActivity;
 import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
@@ -50,12 +46,12 @@ import org.spongepowered.asm.mixin.transformer.meta.MixinRenamed;
 import org.spongepowered.asm.mixin.transformer.throwables.InvalidMixinException;
 import org.spongepowered.asm.mixin.transformer.throwables.MixinApplicatorException;
 import org.spongepowered.asm.service.IMixinAuditTrail;
-import org.spongepowered.asm.service.MixinService;
-import org.spongepowered.asm.util.*;
+import org.spongepowered.asm.util.Annotations;
+import org.spongepowered.asm.util.Bytecode;
 import org.spongepowered.asm.util.Bytecode.DelegateInitialiser;
+import org.spongepowered.asm.util.Constants;
+import org.spongepowered.asm.util.ConstraintParser;
 import org.spongepowered.asm.util.ConstraintParser.Constraint;
-import org.spongepowered.asm.util.perf.Profiler;
-import org.spongepowered.asm.util.perf.Profiler.Section;
 import org.spongepowered.asm.util.throwables.ConstraintViolationException;
 import org.spongepowered.asm.util.throwables.InvalidConstraintException;
 
@@ -210,10 +206,7 @@ public class MixinApplicatorStandard {
         Opcodes.SASTORE
     };
 
-    /**
-     * Log more things
-     */
-    protected final ILogger logger = MixinService.getService().getLogger("mixin");
+    protected final Logger logger;
     
     /**
      * Target class context 
@@ -255,6 +248,7 @@ public class MixinApplicatorStandard {
     
     MixinApplicatorStandard(TargetClassContext context) {
         this.context = context;
+        this.logger = context.getEnvironment().getLogger();
         this.targetName = context.getClassName();
         this.targetClass = context.getClassNode();
         this.targetClassInfo = context.getClassInfo();
@@ -263,7 +257,7 @@ public class MixinApplicatorStandard {
         this.mergeSignatures = exporter.isDecompilerActive()
                 && context.getEnvironment().getOption(Option.DEBUG_EXPORT_DECOMPILE_MERGESIGNATURES);
         
-        this.auditTrail = MixinService.getService().getAuditTrail();
+        this.auditTrail = context.getEnvironment().getService().getAuditTrail();
     }
     
     /**
@@ -271,6 +265,7 @@ public class MixinApplicatorStandard {
      */
     final void apply(SortedSet<MixinInfo> mixins) {
         List<MixinTargetContext> mixinContexts = new ArrayList<MixinTargetContext>();
+        final var environment = targetClassInfo.getEnvironment();
         
         for (Iterator<MixinInfo> iter = mixins.iterator(); iter.hasNext();) {
             MixinInfo mixin = iter.next();
@@ -303,7 +298,7 @@ public class MixinApplicatorStandard {
             
             for (ApplicatorPass pass : ApplicatorPass.values()) {
                 activity.next("%s Applicator Phase", pass);
-                Section timer = this.profiler.begin("pass", pass.name().toLowerCase(Locale.ROOT));
+                var timer = environment.profilerBegin();
                 IActivity applyActivity = this.activities.begin("Mixin");
                 for (Iterator<MixinTargetContext> iter = mixinContexts.iterator(); iter.hasNext();) {
                     current = iter.next();
@@ -319,7 +314,7 @@ public class MixinApplicatorStandard {
                     }
                 }
                 applyActivity.end();
-                timer.end();
+                environment.profilerEnd(profilerSectionFor(pass), timer);
             }
             
             activity.next("PostApply Phase");
@@ -348,6 +343,15 @@ public class MixinApplicatorStandard {
 
         this.applySourceMap(this.context);
         this.context.processDebugTasks();
+    }
+
+    private static ProfilerSection profilerSectionFor(ApplicatorPass pass) {
+        switch (pass) {
+            case MAIN: return ProfilerSection.APPLICATOR_MAIN;
+            case INJECT: return ProfilerSection.APPLICATOR_INJECT;
+            case PREINJECT: return ProfilerSection.APPLICATOR_PREINJECT;
+            default: throw new IllegalStateException();
+        }
     }
 
     /**
@@ -437,7 +441,7 @@ public class MixinApplicatorStandard {
      */
     protected void applyAnnotations(MixinTargetContext mixin) {
         ClassNode sourceClass = mixin.getClassNode();
-        Annotations.merge(sourceClass, this.targetClass);
+        Annotations.merge(mixin.getEnvironment(), sourceClass, this.targetClass);
     }
     
     /**
@@ -458,7 +462,7 @@ public class MixinApplicatorStandard {
             FieldNode shadow = entry.getKey();
             FieldNode target = this.findTargetField(shadow);
             if (target != null) {
-                Annotations.merge(shadow, target);
+                Annotations.merge(mixin.getEnvironment(), shadow, target);
                 
                 // Strip the FINAL flag from @Mutable fields
                 if (entry.getValue().isDecoratedMutable()) {
@@ -510,7 +514,7 @@ public class MixinApplicatorStandard {
     protected void applyShadowMethod(MixinTargetContext mixin, MethodNode shadow) {
         MethodNode target = this.findTargetMethod(shadow);
         if (target != null) {
-            Annotations.merge(shadow, target);
+            Annotations.merge(mixin.getEnvironment(), shadow, target);
         }
     }
 

@@ -50,12 +50,12 @@ final class DefaultExtensions {
             }
         };
         
-        extensions.add(new ArgsClassGenerator(registryDelegate, environment.getOption(MixinEnvironment.Option.DEBUG_VERIFY)));
+        extensions.add(new ArgsClassGenerator(environment, registryDelegate));
         extensions.add(new InnerClassGenerator(registryDelegate, nestHostCoprocessor));
 
         extensions.add(new ExtensionClassExporter(environment));
         extensions.add(new ExtensionCheckClass());
-        extensions.add(new ExtensionCheckInterfaces());
+        extensions.add(new ExtensionCheckInterfaces(environment));
     }
 
 }

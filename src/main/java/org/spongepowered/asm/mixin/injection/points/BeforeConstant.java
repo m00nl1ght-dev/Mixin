@@ -24,22 +24,14 @@
  */
 package org.spongepowered.asm.mixin.injection.points;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.ListIterator;
-import java.util.Locale;
-import java.util.Set;
-
-import org.spongepowered.asm.logging.ILogger;
+import com.google.common.primitives.Doubles;
+import com.google.common.primitives.Floats;
+import com.google.common.primitives.Ints;
+import com.google.common.primitives.Longs;
+import dev.m00nl1ght.clockwork.utils.logger.Logger;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.AnnotationNode;
-import org.objectweb.asm.tree.FrameNode;
-import org.objectweb.asm.tree.InsnList;
-import org.objectweb.asm.tree.LabelNode;
+import org.objectweb.asm.tree.*;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Constant;
 import org.spongepowered.asm.mixin.injection.Constant.Condition;
@@ -48,15 +40,11 @@ import org.spongepowered.asm.mixin.injection.InjectionPoint.AtCode;
 import org.spongepowered.asm.mixin.injection.struct.InjectionPointData;
 import org.spongepowered.asm.mixin.injection.throwables.InvalidInjectionException;
 import org.spongepowered.asm.mixin.refmap.IMixinContext;
-import org.spongepowered.asm.service.MixinService;
 import org.spongepowered.asm.util.Annotations;
 import org.spongepowered.asm.util.Bytecode;
 import org.spongepowered.asm.util.Constants;
 
-import com.google.common.primitives.Doubles;
-import com.google.common.primitives.Floats;
-import com.google.common.primitives.Ints;
-import com.google.common.primitives.Longs;
+import java.util.*;
 
 /**
  * Special injection point which can be defined by an {@link Constant}
@@ -124,7 +112,7 @@ import com.google.common.primitives.Longs;
 @AtCode("CONSTANT")
 public class BeforeConstant extends InjectionPoint {
     
-    private static final ILogger logger = MixinService.getService().getLogger("mixin");
+    private final Logger logger;
 
     /**
      * Ordinal of the target insn
@@ -148,6 +136,7 @@ public class BeforeConstant extends InjectionPoint {
 
     public BeforeConstant(IMixinContext context, AnnotationNode node, String returnType) {
         super(Annotations.<String>getValue(node, "slice", ""), Selector.DEFAULT, null);
+        this.logger = context.getEnvironment().getLogger();
         
         Boolean empty = Annotations.<Boolean>getValue(node, "nullValue", (Boolean)null);
         this.ordinal = Annotations.<Integer>getValue(node, "ordinal", Integer.valueOf(-1));
@@ -168,6 +157,7 @@ public class BeforeConstant extends InjectionPoint {
     
     public BeforeConstant(InjectionPointData data) {
         super(data);
+        this.logger = data.getMixin().getEnvironment().getLogger();
         
         String strNullValue = data.get("nullValue", null);
         Boolean empty = strNullValue != null ? Boolean.parseBoolean(strNullValue) : null;
@@ -308,7 +298,7 @@ public class BeforeConstant extends InjectionPoint {
 
     protected void log(String message, Object... params) {
         if (this.log) {
-            BeforeConstant.logger.info(message, params);
+            logger.info(message, params);
         }
     }
     

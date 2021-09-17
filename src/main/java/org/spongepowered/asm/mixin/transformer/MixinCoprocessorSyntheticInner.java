@@ -24,13 +24,14 @@
  */
 package org.spongepowered.asm.mixin.transformer;
 
-import java.util.HashSet;
-import java.util.Set;
-
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.spongepowered.asm.mixin.MixinEnvironment;
+
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Coprocessor which handles synthetic inner classes in mixins. Since synthetic
@@ -49,7 +50,8 @@ class MixinCoprocessorSyntheticInner extends MixinCoprocessor {
      */
     private final Set<String> syntheticInnerClasses = new HashSet<String>();
 
-    MixinCoprocessorSyntheticInner() {
+    MixinCoprocessorSyntheticInner(MixinEnvironment environment) {
+        super(environment);
     }
     
     @Override

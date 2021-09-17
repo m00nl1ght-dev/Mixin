@@ -24,16 +24,9 @@
  */
 package org.spongepowered.asm.mixin.transformer;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.AnnotationNode;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.InsnNode;
-import org.objectweb.asm.tree.MethodInsnNode;
-import org.objectweb.asm.tree.MethodNode;
+import org.objectweb.asm.tree.*;
 import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.gen.Accessor;
 import org.spongepowered.asm.mixin.gen.Invoker;
@@ -44,8 +37,11 @@ import org.spongepowered.asm.mixin.transformer.meta.MixinProxy;
 import org.spongepowered.asm.mixin.transformer.throwables.MixinTransformerError;
 import org.spongepowered.asm.util.Annotations;
 import org.spongepowered.asm.util.Bytecode;
-import org.spongepowered.asm.util.LanguageFeatures;
 import org.spongepowered.asm.util.Bytecode.Visibility;
+import org.spongepowered.asm.util.LanguageFeatures;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * This coprocessor handles transformations to accessor mixins themselves as
@@ -65,7 +61,8 @@ class MixinCoprocessorAccessor extends MixinCoprocessor {
      */
     private final Map<String, MixinInfo> accessorMixins = new HashMap<String, MixinInfo>();
     
-    MixinCoprocessorAccessor(String sessionId) {
+    MixinCoprocessorAccessor(MixinEnvironment environment, String sessionId) {
+        super(environment);
         this.sessionId = sessionId;
     }
     
@@ -87,7 +84,7 @@ class MixinCoprocessorAccessor extends MixinCoprocessor {
 
     @Override
     ProcessResult process(String className, ClassNode classNode) {
-        if (!MixinEnvironment.getCompatibilityLevel().supports(LanguageFeatures.METHODS_IN_INTERFACES)
+        if (!environment.getCompatibilityLevel().supports(LanguageFeatures.METHODS_IN_INTERFACES)
                     || !this.accessorMixins.containsKey(className)) {
             return ProcessResult.NONE;
         }

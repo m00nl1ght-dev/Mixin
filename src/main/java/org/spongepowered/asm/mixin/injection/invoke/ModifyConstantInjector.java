@@ -24,20 +24,12 @@
  */
 package org.spongepowered.asm.mixin.injection.invoke;
 
-import org.spongepowered.asm.logging.Level;
+import dev.m00nl1ght.clockwork.utils.logger.Logger;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.FieldInsnNode;
-import org.objectweb.asm.tree.InsnList;
-import org.objectweb.asm.tree.InsnNode;
-import org.objectweb.asm.tree.JumpInsnNode;
-import org.objectweb.asm.tree.LocalVariableNode;
-import org.objectweb.asm.tree.TypeInsnNode;
-import org.objectweb.asm.tree.VarInsnNode;
+import org.objectweb.asm.tree.*;
 import org.spongepowered.asm.mixin.MixinEnvironment.Option;
 import org.spongepowered.asm.mixin.injection.ModifyConstant;
-import org.spongepowered.asm.mixin.injection.code.Injector;
 import org.spongepowered.asm.mixin.injection.invoke.util.InsnFinder;
 import org.spongepowered.asm.mixin.injection.struct.InjectionInfo;
 import org.spongepowered.asm.mixin.injection.struct.InjectionNodes.InjectionNode;
@@ -198,8 +190,8 @@ public class ModifyConstantInjector extends RedirectInjector {
             String fromType = SignaturePrinter.getTypeName(constantType, false);
             String toType = SignaturePrinter.getTypeName(type, false);
             String message = toSort == Type.BOOLEAN ? ". Implicit conversion to <boolean> can cause nondeterministic (JVM-specific) behaviour!" : "";
-            Level level = toSort == Type.BOOLEAN ? Level.ERROR : Level.WARN;
-            Injector.logger.log(level, "Narrowing conversion of <{}> to <{}> in {} target {} at opcode {} ({}){}", fromType, toType, this.info,
+            Logger.Level level = toSort == Type.BOOLEAN ? Logger.Level.ERROR : Logger.Level.WARN;
+            logger.log(level, "Narrowing conversion of <{}> to <{}> in {} target {} at opcode {} ({}){}", fromType, toType, this.info,
                     target, index, description, message);
         }
     }

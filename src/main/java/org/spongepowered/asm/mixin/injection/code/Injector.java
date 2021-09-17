@@ -24,21 +24,11 @@
  */
 package org.spongepowered.asm.mixin.injection.code;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-
-import org.spongepowered.asm.logging.ILogger;
+import com.google.common.collect.ObjectArrays;
+import dev.m00nl1ght.clockwork.utils.logger.Logger;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.*;
-import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.MixinEnvironment.Option;
 import org.spongepowered.asm.mixin.injection.Coerce;
 import org.spongepowered.asm.mixin.injection.InjectionPoint;
@@ -46,21 +36,20 @@ import org.spongepowered.asm.mixin.injection.InjectionPoint.RestrictTargetLevel;
 import org.spongepowered.asm.mixin.injection.invoke.RedirectInjector;
 import org.spongepowered.asm.mixin.injection.struct.InjectionInfo;
 import org.spongepowered.asm.mixin.injection.struct.InjectionNodes.InjectionNode;
-import org.spongepowered.asm.mixin.injection.struct.Target.Extension;
 import org.spongepowered.asm.mixin.injection.struct.Target;
+import org.spongepowered.asm.mixin.injection.struct.Target.Extension;
 import org.spongepowered.asm.mixin.injection.throwables.InjectionError;
 import org.spongepowered.asm.mixin.injection.throwables.InvalidInjectionException;
 import org.spongepowered.asm.mixin.refmap.IMixinContext;
 import org.spongepowered.asm.mixin.transformer.ClassInfo;
 import org.spongepowered.asm.mixin.transformer.ClassInfo.Traversal;
 import org.spongepowered.asm.mixin.transformer.ClassInfo.TypeLookup;
-import org.spongepowered.asm.service.MixinService;
 import org.spongepowered.asm.util.Annotations;
 import org.spongepowered.asm.util.Bytecode;
-import org.spongepowered.asm.util.SignaturePrinter;
 import org.spongepowered.asm.util.Bytecode.DelegateInitialiser;
+import org.spongepowered.asm.util.SignaturePrinter;
 
-import com.google.common.collect.ObjectArrays;
+import java.util.*;
 
 /**
  * Base class for bytecode injectors
@@ -164,10 +153,7 @@ public abstract class Injector {
 
     }
 
-    /**
-     * Log more things
-     */
-    protected static final ILogger logger = MixinService.getService().getLogger("mixin");
+    protected final Logger logger;
 
     /**
      * Injection info
@@ -212,6 +198,7 @@ public abstract class Injector {
     public Injector(InjectionInfo info, String annotationType) {
         this.info = info;
         this.annotationType = annotationType;
+        this.logger = info.getEnvironment().getLogger();
 
         this.classNode = info.getClassNode();
         this.methodNode = info.getMethod();
@@ -270,7 +257,7 @@ public abstract class Injector {
         for (InjectionNode node : nodes) {
             if (node.isRemoved()) {
                 if (this.info.getMixin().getOption(Option.DEBUG_VERBOSE)) {
-                    Injector.logger.warn("Target node for {} was removed by a previous injector in {}", this.info, target);
+                    logger.warn("Target node for {} was removed by a previous injector in {}", this.info, target);
                 }
                 continue;
             }
@@ -638,7 +625,7 @@ public abstract class Injector {
         
         if (fromType.equals(toType)) {
             if (coerce != null && this.info.getMixin().getOption(Option.DEBUG_VERBOSE)) {
-                Injector.logger.info("Possibly-redundant @Coerce on {} {} type{}, {} is identical to {}", description, argType, argIndex,
+                logger.info("Possibly-redundant @Coerce on {} {} type{}, {} is identical to {}", description, argType, argIndex,
                         SignaturePrinter.getTypeName(toType), SignaturePrinter.getTypeName(fromType));
             }
             return false;

@@ -268,7 +268,7 @@ public class RedirectInjector extends InvokeInjector {
             
             if (other != null && other.getOwner() != this) {
                 if (other.priority >= this.meta.priority) {
-                    Injector.logger.warn("{} conflict. Skipping {} with priority {}, already redirected by {} with priority {}",
+                    logger.warn("{} conflict. Skipping {} with priority {}, already redirected by {} with priority {}",
                             this.annotationType, this.info, this.meta.priority, other.name, other.priority);
                     return;
                 } else if (other.isFinal) {
@@ -355,7 +355,7 @@ public class RedirectInjector extends InvokeInjector {
     protected boolean preInject(InjectionNode node) {
         Meta other = node.getDecoration(Meta.KEY);
         if (other.getOwner() != this) {
-            Injector.logger.warn("{} conflict. Skipping {} with priority {}, already redirected by {} with priority {}",
+            logger.warn("{} conflict. Skipping {} with priority {}, already redirected by {} with priority {}",
                     this.annotationType, this.info, this.meta.priority, other.name, other.priority);
             return false;
         }

@@ -24,16 +24,13 @@
  */
 package org.spongepowered.asm.mixin.transformer;
 
-import java.util.*;
-import java.util.stream.Collectors;
-
-import org.spongepowered.asm.logging.Level;
-import org.spongepowered.asm.logging.ILogger;
-import org.spongepowered.asm.launch.MixinInitialisationError;
+import com.google.common.base.Strings;
+import dev.m00nl1ght.clockwork.utils.logger.Logger;
 import org.objectweb.asm.tree.InsnList;
 import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.MixinEnvironment.CompatibilityLevel;
 import org.spongepowered.asm.mixin.MixinEnvironment.Option;
+import org.spongepowered.asm.mixin.MixinInitialisationError;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfig;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
@@ -41,12 +38,12 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.InjectionPoint;
 import org.spongepowered.asm.mixin.injection.selectors.ITargetSelectorDynamic;
-import org.spongepowered.asm.mixin.injection.selectors.TargetSelector;
 import org.spongepowered.asm.mixin.refmap.IReferenceMapper;
 import org.spongepowered.asm.mixin.refmap.ReferenceMapper;
 import org.spongepowered.asm.util.VersionNumber;
 
-import com.google.common.base.Strings;
+import java.util.*;
+import java.util.stream.Collectors;
 
 public final class MixinConfig implements IMixinConfig {
 
@@ -77,8 +74,6 @@ public final class MixinConfig implements IMixinConfig {
         boolean requireOverwriteAnnotations;
         
     }
-
-    private final ILogger logger = MixinService.getService().getLogger("mixin");
 
     /**
      * Minimum version of the mixin subsystem required to correctly apply mixins
@@ -182,9 +177,9 @@ public final class MixinConfig implements IMixinConfig {
                     this.name, this.compatibilityLevel, currentLevel));
         }
 
-        CompatibilityLevel minCompatibilityLevel = MixinEnvironment.getMinCompatibilityLevel();
+        CompatibilityLevel minCompatibilityLevel = environment.getMinCompatibilityLevel();
         if (this.compatibilityLevel.isLessThan(minCompatibilityLevel)) {
-            this.logger.log(this.verboseLogging ? Level.INFO : Level.DEBUG,
+            environment.getLogger().log(this.verboseLogging ? Logger.Level.INFO : Logger.Level.DEBUG,
                     "Compatibility level {} specified by {} is lower than the default level supported by the current mixin service ({}).",
                     this.compatibilityLevel, this, minCompatibilityLevel);
         }
@@ -194,7 +189,7 @@ public final class MixinConfig implements IMixinConfig {
         // or the mixin author is trying to elevate the compatibility level beyond
         // the versions currently supported
         if (CompatibilityLevel.MAX_SUPPORTED.isLessThan(this.compatibilityLevel)) {
-            this.logger.log(this.verboseLogging ? Level.WARN : Level.DEBUG,
+            environment.getLogger().log(this.verboseLogging ? Logger.Level.WARN : Logger.Level.DEBUG,
                     "Compatibility level {} specified by {} is higher than the maximum level supported by this version of mixin ({}).",
                     this.compatibilityLevel, this, CompatibilityLevel.MAX_SUPPORTED);
         }
@@ -217,12 +212,12 @@ public final class MixinConfig implements IMixinConfig {
         if (majorVersion <= this.compatibilityLevel.getClassMajorVersion()) {
             return;
         }
-        
-        Level logLevel = this.verboseLogging && majorVersion > this.warnedClassVersion ? Level.WARN : Level.DEBUG;
+
+        Logger.Level logLevel = this.verboseLogging && majorVersion > this.warnedClassVersion ? Logger.Level.WARN : Logger.Level.DEBUG;
         String message = majorVersion > CompatibilityLevel.MAX_SUPPORTED.getClassMajorVersion()
                 ? "the current version of Mixin" : "the declared compatibility level";
         this.warnedClassVersion = majorVersion;
-        this.logger.log(logLevel, "{}: Class version {} required is higher than the class version supported by {} ({} supports class version {})",
+        mixin.getEnvironment().getLogger().log(logLevel, "{}: Class version {} required is higher than the class version supported by {} ({} supports class version {})",
                 mixin, majorVersion, message, this.compatibilityLevel, this.compatibilityLevel.getClassMajorVersion());
     }
     
@@ -248,7 +243,7 @@ public final class MixinConfig implements IMixinConfig {
                 try {
                     injectionPointClass.getMethod("find", String.class, InsnList.class, Collection.class);
                 } catch (NoSuchMethodException cnfe) {
-                    this.logger.error("Unable to register injection point {} for {}, the class is not compatible with this version of Mixin",
+                    environment.getLogger().error("Unable to register injection point {} for {}, the class is not compatible with this version of Mixin",
                             className, this, cnfe);
                     return;
                 }
@@ -256,7 +251,7 @@ public final class MixinConfig implements IMixinConfig {
                 environment.getInjectionPointRegistry().register((Class<? extends InjectionPoint>)injectionPointClass, namespace);
             }
         } catch (Throwable th) {
-            this.logger.catching(th);
+            environment.getLogger().catching(th);
         }
     }
 
@@ -268,7 +263,7 @@ public final class MixinConfig implements IMixinConfig {
                 environment.getTargetSelectorRegistry().register((Class<? extends ITargetSelectorDynamic>)dynamicSelectorClass, namespace);
             }
         } catch (Throwable th) {
-            this.logger.catching(th);
+            environment.getLogger().catching(th);
         }
     }
     
@@ -277,12 +272,12 @@ public final class MixinConfig implements IMixinConfig {
         try {
             extensionClass = environment.getService().getClassProvider().findClass(className, true);
         } catch (ClassNotFoundException cnfe) {
-            this.logger.error("Unable to register {} {} for {}, the specified class was not found", extensionType, className, this, cnfe);
+            environment.getLogger().error("Unable to register {} {} for {}, the specified class was not found", extensionType, className, this, cnfe);
             return null;
         }
         
         if (!superType.isAssignableFrom(extensionClass)) {
-            this.logger.error("Unable to register {} {} for {}, class is not assignable to {}", extensionType, className, this, superType);
+            environment.getLogger().error("Unable to register {} {} for {}, class is not assignable to {}", extensionType, className, this, superType);
             return null;
         }
         return extensionClass;
@@ -290,13 +285,13 @@ public final class MixinConfig implements IMixinConfig {
 
     private boolean checkVersion(MixinEnvironment environment) throws MixinInitialisationError {
         if (this.minVersion == null) {
-            this.logger.error("Mixin config {} does not specify \"minVersion\" property", this.name);
+            environment.getLogger().error("Mixin config {} does not specify \"minVersion\" property", this.name);
         }
         
         VersionNumber minVersion = VersionNumber.parse(this.minVersion);
         VersionNumber curVersion = VersionNumber.parse(environment.getVersion());
         if (minVersion.compareTo(curVersion) > 0) {
-            this.logger.warn("Mixin config {} requires mixin subsystem version {} but {} was found. The mixin config will not be applied.",
+            environment.getLogger().warn("Mixin config {} requires mixin subsystem version {} but {} was found. The mixin config will not be applied.",
                     this.name, minVersion, curVersion);
             
             if (this.required) {
@@ -517,8 +512,9 @@ public final class MixinConfig implements IMixinConfig {
         return (V) (this.decorations == null ? null : this.decorations.get(key));
     }
 
-    public Level getLoggingLevel() {
-        return this.verboseLogging ? Level.INFO : Level.DEBUG;
+    @Override
+    public Logger.Level getLoggingLevel() {
+        return this.verboseLogging ? Logger.Level.INFO : Logger.Level.DEBUG;
     }
 
     @Override

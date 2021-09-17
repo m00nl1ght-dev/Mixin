@@ -24,10 +24,6 @@
  */
 package org.spongepowered.asm.mixin.struct;
 
-import java.util.Locale;
-
-import javax.tools.Diagnostic.Kind;
-
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.MethodNode;
 import org.spongepowered.asm.mixin.MixinEnvironment.Option;
@@ -37,7 +33,8 @@ import org.spongepowered.asm.mixin.refmap.IMixinContext;
 import org.spongepowered.asm.mixin.refmap.IReferenceMapper;
 import org.spongepowered.asm.util.Annotations;
 import org.spongepowered.asm.util.asm.IAnnotationHandle;
-import org.spongepowered.asm.util.logging.MessageRouter;
+
+import java.util.Locale;
 
 /**
  * Data bundle for an annotated method in a mixin
@@ -148,15 +145,11 @@ public class AnnotatedMethodInfo implements IInjectionPointContext {
     public String getSelectorCoordinate(boolean leaf) {
         return leaf ? "method" : this.getMethodName().toLowerCase(Locale.ROOT);
     }
-    
-    /* (non-Javadoc)
-     * @see org.spongepowered.asm.mixin.injection.IInjectionPointContext
-     *      #addMessage(java.lang.String, java.lang.Object[])
-     */
+
     @Override
     public void addMessage(String format, Object... args) {
         if (this.context.getOption(Option.DEBUG_VERBOSE)) {
-            MessageRouter.getMessager().printMessage(Kind.WARNING, String.format(format, args));
+            context.getEnvironment().getLogger().warn(format, args);
         }
     }
 

@@ -24,17 +24,13 @@
  */
 package org.spongepowered.asm.mixin.injection.struct;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.MethodNode;
+import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.injection.Group;
 import org.spongepowered.asm.mixin.injection.throwables.InjectionValidationException;
-import org.spongepowered.asm.service.MixinService;
 import org.spongepowered.asm.util.Annotations;
 
 /**
@@ -48,9 +44,16 @@ public class InjectorGroupInfo {
     public static final class Map extends HashMap<String, InjectorGroupInfo> {
         
         private static final long serialVersionUID = 1L;
-        
-        private static final InjectorGroupInfo NO_GROUP = new InjectorGroupInfo("NONE", true);
-        
+
+        private final MixinEnvironment environment;
+
+        private final InjectorGroupInfo NO_GROUP;
+
+        public Map(MixinEnvironment environment) {
+            this.environment = Objects.requireNonNull(environment);
+            this.NO_GROUP = new InjectorGroupInfo(environment, "NONE", true);
+        }
+
         @Override
         public InjectorGroupInfo get(Object key) {
             return this.forName(key.toString());
@@ -66,7 +69,7 @@ public class InjectorGroupInfo {
         public InjectorGroupInfo forName(String name) {
             InjectorGroupInfo value = super.get(name);
             if (value == null) {
-                value = new InjectorGroupInfo(name);
+                value = new InjectorGroupInfo(environment, name);
                 this.put(name, value);
             }
             return value;
@@ -94,7 +97,7 @@ public class InjectorGroupInfo {
          */
         public InjectorGroupInfo parseGroup(AnnotationNode annotation, String defaultGroup) {
             if (annotation == null) {
-                return InjectorGroupInfo.Map.NO_GROUP;
+                return NO_GROUP;
             }
             
             String name = Annotations.<String>getValue(annotation, "name");
@@ -154,11 +157,14 @@ public class InjectorGroupInfo {
      */
     private int maxCallbackCount = Integer.MAX_VALUE;
 
-    public InjectorGroupInfo(String name) {
-        this(name, false);
+    private final MixinEnvironment environment;
+
+    public InjectorGroupInfo(MixinEnvironment environment, String name) {
+        this(environment, name, false);
     }
     
-    InjectorGroupInfo(String name, boolean flag) {
+    InjectorGroupInfo(MixinEnvironment environment, String name, boolean flag) {
+        this.environment = Objects.requireNonNull(environment);
         this.name = name;
         this.isDefault = flag;
     }
@@ -207,7 +213,7 @@ public class InjectorGroupInfo {
                     + min + " on " + this);
         }
         if (this.minCallbackCount > 0 && this.minCallbackCount != min) {
-            MixinService.getService().getLogger("mixin").warn("Conflicting min value '{}' on @Group({}), previously specified {}", min, this.name,
+            environment.getLogger().warn("Conflicting min value '{}' on @Group({}), previously specified {}", min, this.name,
                     this.minCallbackCount);
         }
         this.minCallbackCount = Math.max(this.minCallbackCount, min);
@@ -227,7 +233,7 @@ public class InjectorGroupInfo {
                     + max + " on " + this);
         }
         if (this.maxCallbackCount < Integer.MAX_VALUE && this.maxCallbackCount != max) {
-            MixinService.getService().getLogger("mixin").warn("Conflicting max value '{}' on @Group({}), previously specified {}", max, this.name,
+            environment.getLogger().warn("Conflicting max value '{}' on @Group({}), previously specified {}", max, this.name,
                     this.maxCallbackCount);
         }
         this.maxCallbackCount = Math.min(this.maxCallbackCount, max);

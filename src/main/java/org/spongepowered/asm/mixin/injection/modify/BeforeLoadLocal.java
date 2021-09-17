@@ -24,9 +24,6 @@
  */
 package org.spongepowered.asm.mixin.injection.modify;
 
-import java.util.Collection;
-import java.util.ListIterator;
-
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -39,6 +36,9 @@ import org.spongepowered.asm.mixin.injection.modify.ModifyVariableInjector.Local
 import org.spongepowered.asm.mixin.injection.struct.InjectionInfo;
 import org.spongepowered.asm.mixin.injection.struct.InjectionPointData;
 import org.spongepowered.asm.mixin.injection.struct.Target;
+
+import java.util.Collection;
+import java.util.ListIterator;
 
 /**
  * <p>This injection point is a companion for the {@link ModifyVariable}
@@ -138,7 +138,7 @@ public class BeforeLoadLocal extends LocalVariableInjectionPoint {
             try {
                 local = BeforeLoadLocal.this.discriminator.findLocal(context);
             } catch (InvalidImplicitDiscriminatorException ex) {
-                BeforeLoadLocal.this.addMessage("%s has invalid IMPLICIT discriminator for opcode %d in %s: %s",
+                BeforeLoadLocal.this.addMessage("{} has invalid IMPLICIT discriminator for opcode {} in {}: {}",
                         BeforeLoadLocal.this.toString(context), target.indexOf(insn), target, ex.getMessage());
             }
             

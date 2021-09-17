@@ -24,11 +24,11 @@
  */
 package org.spongepowered.asm.service;
 
-import java.io.InputStream;
-import java.util.Collection;
-
+import dev.m00nl1ght.clockwork.utils.logger.Logger;
 import org.spongepowered.asm.mixin.MixinEnvironment.CompatibilityLevel;
 import org.spongepowered.asm.util.ReEntranceLock;
+
+import java.io.InputStream;
 
 /**
  * Mixin Service interface. Mixin services connect the mixin subsytem to the
@@ -44,11 +44,6 @@ public interface IMixinService {
      * Get the friendly name for this service
      */
     public abstract String getName();
-
-    /**
-     * True if this service type is valid in the current environment
-     */
-    public abstract boolean isValid();
     
     /**
      * Get the transformer re-entrance lock for this service, the transformer
@@ -99,11 +94,6 @@ public interface IMixinService {
      * @return input stream or null if resource not found
      */
     public abstract InputStream getResourceAsStream(String name);
-
-    /**
-     * Get the detected side name for this environment
-     */
-    public abstract String getSideName();
     
     /**
      * Get the minimum compatibility level supported by this service. Can return
@@ -142,6 +132,8 @@ public interface IMixinService {
      * @param name Logger name
      * @return Logger adapter for the underlying logging subsystem
      */
-    public abstract ILogger getLogger(final String name);
+    public abstract Logger getLogger(final String name);
+
+    public abstract Logger getLogger();
 
 }

@@ -24,16 +24,9 @@
  */
 package org.spongepowered.asm.mixin.injection.invoke.util;
 
-import org.spongepowered.asm.logging.ILogger;
 import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.analysis.Analyzer;
-import org.objectweb.asm.tree.analysis.AnalyzerException;
-import org.objectweb.asm.tree.analysis.BasicInterpreter;
-import org.objectweb.asm.tree.analysis.BasicValue;
-import org.objectweb.asm.tree.analysis.Frame;
-import org.objectweb.asm.tree.analysis.Interpreter;
+import org.objectweb.asm.tree.analysis.*;
 import org.spongepowered.asm.mixin.injection.struct.Target;
-import org.spongepowered.asm.service.MixinService;
 
 /**
  * Utility class for finding instructions using static analysis
@@ -41,7 +34,7 @@ import org.spongepowered.asm.service.MixinService;
 public class InsnFinder {
     
     /**
-     * Exception to be throw to quick-exit the analyser once result is found
+     * Exception to be thrown to quick-exit the analyser once result is found
      */
     static class AnalysisResultException extends RuntimeException {
 
@@ -147,11 +140,6 @@ public class InsnFinder {
     }
     
     /**
-     * Log more things
-     */
-    private static final ILogger logger = MixinService.getService().getLogger("mixin");
-    
-    /**
      * Find the instruction which pops the value pushed by the specified
      * instruction
      * 
@@ -166,7 +154,7 @@ public class InsnFinder {
             if (ex.getCause() instanceof AnalysisResultException) {
                 return ((AnalysisResultException)ex.getCause()).getResult();
             }
-            InsnFinder.logger.catching(ex);
+            target.getEnvironment().getLogger().catching(ex);
         }
         return null;
     }

@@ -24,7 +24,8 @@
  */
 package org.spongepowered.asm.mixin.extensibility;
 
-import org.spongepowered.asm.logging.Level;
+
+import dev.m00nl1ght.clockwork.utils.logger.Logger;
 
 /**
  * Interface for objects which want to perform custom behaviour when fatal mixin
@@ -43,26 +44,26 @@ public interface IMixinErrorHandler {
          * Take no action, this should be treated as a non-critical error and
          * processing should continue 
          */
-        NONE(Level.INFO),
+        NONE(Logger.Level.INFO),
         
         /**
          * Generate a warning but continue processing 
          */
-        WARN(Level.WARN),
+        WARN(Logger.Level.WARN),
         
         /**
          * Throw a
          * {@link org.spongepowered.asm.mixin.throwables.MixinApplyError} to
          * halt further processing if possible
          */
-        ERROR(Level.FATAL);
+        ERROR(Logger.Level.ERROR);
         
         /**
          * Logging level for the specified error action
          */
-        public final Level logLevel;
+        public final Logger.Level logLevel;
 
-        private ErrorAction(Level logLevel) {
+        private ErrorAction(Logger.Level logLevel) {
             this.logLevel = logLevel;
         }
     }

@@ -24,7 +24,7 @@
  */
 package org.spongepowered.asm.mixin.extensibility;
 
-import org.apache.logging.log4j.Level;
+import dev.m00nl1ght.clockwork.utils.logger.Logger;
 import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.refmap.IReferenceMapper;
 import org.spongepowered.asm.mixin.transformer.MixinInfo;
@@ -150,7 +150,7 @@ public interface IMixinConfig {
     /**
      * Get the logging level for this config
      */
-    public Level getLoggingLevel();
+    public Logger.Level getLoggingLevel();
 
     /**
      * Get whether verbose logging is enabled

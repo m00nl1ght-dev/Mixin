@@ -4,15 +4,13 @@ buildscript {
         gradlePluginPortal()
     }
     dependencies {
-        classpath 'nl.javadude.gradle.plugins:license-gradle-plugin:0.11.0'
+        classpath 'gradle.plugin.com.hierynomus.gradle.plugins:license-gradle-plugin:0.16.1'
     }
 }
 
-apply plugin: 'java'
-apply plugin: 'license'
-// apply plugin: 'checkstyle'
-apply plugin: 'eclipse'
-apply plugin: 'idea'
+apply plugin: 'java-library'
+apply plugin: 'maven-publish'
+apply plugin: 'com.github.hierynomus.license'
 
 defaultTasks 'licenseFormat', 'check', 'build'
 
@@ -20,11 +18,14 @@ group = 'org.spongepowered'
 archivesBaseName = 'mixin'
 version = buildVersion + (buildType == 'RELEASE' ? '' : "-$buildType")
 
-sourceCompatibility = '1.8'
-targetCompatibility = '1.8'
+java {
+    modularity.inferModulePath = true
+    toolchain.languageVersion = JavaLanguageVersion.of(11)
+}
 
 repositories {
     mavenCentral()
+    maven { url "https://m00nl1ght.dev/maven/" }
 }
 
 sourceSets {
@@ -36,27 +37,26 @@ sourceSets {
     universalTestExample {
         compileClasspath += universalTest.output
         compileClasspath += main.output
-        ext.languageVersion = 8
-        ext.compatibility = '1.6'
-        ext.modularityExcluded = true
     }
 }
 
 dependencies {
-    compile 'com.google.guava:guava:30.1.1-jre'
-    compile 'org.apache.logging.log4j:log4j-core:2.14.1'
+    // api 'dev.m00nl1ght.clockwork.utils:config:0.7'
+    api 'dev.m00nl1ght.clockwork.utils:logger:0.7'
+    api 'dev.m00nl1ght.clockwork.utils:profiler:0.7'
+
+    implementation 'com.google.guava:guava:30.1.1-jre'
 
     implementation "org.ow2.asm:asm-tree:$asmVersion"
     implementation "org.ow2.asm:asm-commons:$asmVersion"
     implementation "org.ow2.asm:asm-util:$asmVersion"
 
-    universalTestCompile configurations.compile
     universalTestImplementation configurations.implementation
 }
 
 processResources {
     // Include in final JAR
-   from 'LICENSE.txt'
+    from 'LICENSE.txt'
 }
 
 license {
@@ -75,59 +75,8 @@ license {
     }
 }
 
-/*
-checkstyle {
-    configProperties = [
-        "name"        : project.name,
-        "organization": project.organization,
-        "url"         : project.url,
-        "year"        : project.inceptionYear
-    ]
-    configFile = file("checkstyle.xml")
-    toolVersion = '8.43'
-}
-*/
-
 tasks.withType(JavaCompile) {
     options.compilerArgs += ['-Xlint:all', '-Xlint:-path', '-proc:none']
     options.deprecation = true
     options.encoding = 'utf8'
-}
-
-def modularityInputs = objects.fileCollection()
-
-project.sourceSets.each { set -> {
-    if (set.ext.has("languageVersion")) {
-        project.tasks[set.compileJavaTaskName].javaCompiler = javaToolchains.compilerFor {
-            languageVersion = JavaLanguageVersion.of(set.ext.languageVersion)
-        }
-    } 
-    if (set.ext.has("compatibility")) {
-        project.tasks[set.compileJavaTaskName].sourceCompatibility = set.ext.compatibility
-        project.tasks[set.compileJavaTaskName].targetCompatibility = set.ext.compatibility
-    }
-    def modularityExcluded = set.ext.has("modularityExcluded") && set.ext.modularityExcluded
-    if (!modularityExcluded) {
-        project.sourceSets.modularity {
-            compileClasspath += set.output
-        }
-        modularityInputs.from set.output
-    }
-}}
-
-compileModularityJava {
-    inputs.files(modularityInputs)
-    doFirst {
-        options.compilerArgs = [
-            '--module-path', classpath.asPath,
-            '--patch-module', "org.spongepowered.mixin=${modularityInputs.collect { it.absolutePath }.join(File.pathSeparator)}"
-        ]
-    }
-}
-
-if (JavaVersion.current().isJava8Compatible()) {
-    tasks.withType(Javadoc) {
-        // disable the crazy super-strict doclint tool in Java 8
-        options.addStringOption('Xdoclint:syntax', '-quiet')
-    }
 }

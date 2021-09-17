@@ -24,28 +24,26 @@
  */
 package org.spongepowered.asm.mixin.transformer;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-
-import org.spongepowered.asm.logging.ILogger;
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.commons.ClassRemapper;
 import org.objectweb.asm.commons.Remapper;
 import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.commons.ClassRemapper;
+import org.spongepowered.asm.mixin.ProfilerSection;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 import org.spongepowered.asm.mixin.transformer.ClassInfo.Method;
 import org.spongepowered.asm.mixin.transformer.ext.IClassGenerator;
 import org.spongepowered.asm.mixin.transformer.throwables.InvalidMixinException;
 import org.spongepowered.asm.service.ISyntheticClassInfo;
-import org.spongepowered.asm.service.MixinService;
 import org.spongepowered.asm.util.IConsumer;
 import org.spongepowered.asm.util.asm.ASM;
 
-import com.google.common.collect.BiMap;
-import com.google.common.collect.HashBiMap;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * Class generator which creates unique copies of inner classes within mixins
@@ -154,7 +152,7 @@ final class InnerClassGenerator implements IClassGenerator {
         }
         
         void accept(final ClassVisitor classVisitor) throws ClassNotFoundException, IOException {
-            ClassNode classNode = MixinService.getService().getBytecodeProvider().getClassNode(this.originalName);
+            ClassNode classNode = mixin.getEnvironment().getService().getBytecodeProvider().getClassNode(this.originalName);
             classNode.accept(classVisitor);
             this.loadCounter++;
         }
@@ -250,12 +248,7 @@ final class InnerClassGenerator implements IClassGenerator {
         }
         
     }
-    
-    /**
-     * Logger
-     */
-    private static final ILogger logger = MixinService.getService().getLogger("mixin");
-    
+
     /**
      * Synthetic class registry 
      */
@@ -316,7 +309,7 @@ final class InnerClassGenerator implements IClassGenerator {
         this.innerClassNames.put(coordinate, uniqueName);
         this.innerClasses.put(uniqueName, info);
         this.registry.accept(info);
-        InnerClassGenerator.logger.debug("Inner class {} in {} on {} gets unique name {}",
+        owner.getEnvironment().getLogger().debug("Inner class {} in {} on {} gets unique name {}",
                 innerClassName, owner.getClassRef(), targetClass, uniqueName);
         this.nestHostCoprocessor.registerNestMember(nestHost.getClassName(), uniqueName);
     }
@@ -363,13 +356,16 @@ final class InnerClassGenerator implements IClassGenerator {
      */
     private boolean generate(InnerClassInfo info, ClassNode classNode) {
         try {
-            InnerClassGenerator.logger.debug("Generating mapped inner class {} (originally {})", info.getName(), info.getOriginalName());
+            final var env = info.mixin.getEnvironment();
+            env.getLogger().debug("Generating mapped inner class {} (originally {})", info.getName(), info.getOriginalName());
+            var timer = env.profilerBegin();
             info.accept(new InnerClassAdapter(classNode, info));
+            env.profilerEnd(ProfilerSection.GENERATE_INNER, timer);
             return true;
         } catch (InvalidMixinException ex) {
             throw ex;
         } catch (Exception ex) {
-            InnerClassGenerator.logger.catching(ex);
+            info.mixin.getEnvironment().getLogger().catching(ex);
         }
         
         return false;

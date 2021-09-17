@@ -29,7 +29,6 @@ import java.util.LinkedList;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
 
-import org.spongepowered.asm.logging.ILogger;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.InsnList;
@@ -42,7 +41,6 @@ import org.spongepowered.asm.mixin.injection.Slice;
 import org.spongepowered.asm.mixin.injection.struct.InjectionPointAnnotationContext;
 import org.spongepowered.asm.mixin.injection.throwables.InjectionError;
 import org.spongepowered.asm.mixin.injection.throwables.InvalidSliceException;
-import org.spongepowered.asm.service.MixinService;
 import org.spongepowered.asm.util.Annotations;
 
 import com.google.common.base.Strings;
@@ -292,11 +290,6 @@ public final class MethodSlice {
         }
         
     }
-    
-    /**
-     * Make with the logging already
-     */
-    private static final ILogger logger = MixinService.getService().getLogger("mixin");
 
     /**
      * Owner of this slice
@@ -407,7 +400,7 @@ public final class MethodSlice {
         
         if (!result) {
             if (this.owner.getMixin().getOption(Option.DEBUG_VERBOSE)) {
-                MethodSlice.logger.warn("{} did not match any instructions", this.describe(description));
+                owner.getMixin().getEnvironment().getLogger().warn("{} did not match any instructions", this.describe(description));
             }
             return failValue;
         }

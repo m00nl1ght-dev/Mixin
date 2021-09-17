@@ -25,14 +25,13 @@
 package org.spongepowered.asm.mixin.transformer;
 
 import com.google.common.base.Strings;
-import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import dev.m00nl1ght.clockwork.utils.logger.Logger;
 import org.objectweb.asm.tree.AnnotationNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.MixinEnvironment;
 import org.spongepowered.asm.mixin.MixinEnvironment.Option;
+import org.spongepowered.asm.mixin.ProfilerSection;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfig;
 import org.spongepowered.asm.mixin.extensibility.IMixinConfigPlugin;
 import org.spongepowered.asm.mixin.extensibility.IMixinErrorHandler;
@@ -55,12 +54,9 @@ import org.spongepowered.asm.mixin.transformer.throwables.MixinTransformerError;
 import org.spongepowered.asm.mixin.transformer.throwables.ReEntrantTransformerError;
 import org.spongepowered.asm.service.IMixinAuditTrail;
 import org.spongepowered.asm.service.IMixinService;
-import org.spongepowered.asm.service.MixinService;
 import org.spongepowered.asm.util.Annotations;
 import org.spongepowered.asm.util.PrettyPrinter;
 import org.spongepowered.asm.util.ReEntranceLock;
-import org.spongepowered.asm.util.perf.Profiler;
-import org.spongepowered.asm.util.perf.Profiler.Section;
 
 import java.text.DecimalFormat;
 import java.util.*;
@@ -256,11 +252,11 @@ class MixinProcessor {
                         listener.onInit(mixin);
                     }
                 } catch (InvalidMixinException ex) {
-                    logger.error(ex.getMixin() + ": " + ex.getMessage(), ex);
+                    processor.logger.error(ex.getMixin() + ": " + ex.getMessage(), ex);
                     this.removeMixin(mixin);
                     iter.remove();
                 } catch (Exception ex) {
-                    logger.error(ex.getMessage(), ex);
+                    processor.logger.error(ex.getMessage(), ex);
                     this.removeMixin(mixin);
                     iter.remove();
                 }
@@ -284,7 +280,7 @@ class MixinProcessor {
 
             if (Strings.isNullOrEmpty(this.config.getMixinPackage())) {
                 if (mixinClasses.size() > 0) {
-                    logger.error("{} declares mixin classes in {} but does not specify a package, {} orphaned mixins will not be loaded: {}",
+                    processor.logger.error("{} declares mixin classes in {} but does not specify a package, {} orphaned mixins will not be loaded: {}",
                             this, collectionName, mixinClasses.size(), mixinClasses);
                 }
                 return;
@@ -298,18 +294,18 @@ class MixinProcessor {
                 MixinInfo mixin = null;
 
                 try {
-                    this.pendingMixins.add(mixin = new MixinInfo(processor.environment, config, mixinClass, this.config.getPlugin(), ignorePlugin));
+                    this.pendingMixins.add(mixin = new MixinInfo(processor.environment, config, mixinClass, this.config.getPlugin(), ignorePlugin, processor.extensions));
                     processor.globalMixinList.add(mixinClass);
                 } catch (InvalidMixinException ex) {
                     if (this.config.isRequired()) {
                         throw ex;
                     }
-                    logger.error(ex.getMessage(), ex);
+                    processor.logger.error(ex.getMessage(), ex);
                 } catch (Exception ex) {
                     if (this.config.isRequired()) {
                         throw new InvalidMixinException(mixin, "Error initialising mixin " + mixin + " - " + ex.getClass() + ": " + ex.getMessage(), ex);
                     }
-                    logger.error(ex.getMessage(), ex);
+                    processor.logger.error(ex.getMessage(), ex);
                 }
             }
 
@@ -331,12 +327,12 @@ class MixinProcessor {
                     if (this.config.isRequired()) {
                         throw ex;
                     }
-                    logger.error(ex.getMessage(), ex);
+                    processor.logger.error(ex.getMessage(), ex);
                 } catch (Exception ex) {
                     if (this.config.isRequired()) {
                         throw new InvalidMixinException(mixin, "Error initialising mixin " + mixin + " - " + ex.getClass() + ": " + ex.getMessage(), ex);
                     }
-                    logger.error(ex.getMessage(), ex);
+                    processor.logger.error(ex.getMessage(), ex);
                 }
             }
 
@@ -382,9 +378,9 @@ class MixinProcessor {
 
     }
 
-    static final ILogger logger = MixinService.getService().getLogger("mixin");
+    private final Logger logger;
     
-    private final IMixinService service = MixinService.getService();
+    private final IMixinService service;
 
     private final List<ConfigWrapper> configs = new ArrayList<ConfigWrapper>();
 
@@ -414,14 +410,12 @@ class MixinProcessor {
     private final IHotSwap hotSwapper;
     
     private final MixinCoprocessors coprocessors = new MixinCoprocessors();
-    
-    private final Profiler profiler;
 
     private final IMixinAuditTrail auditTrail;
 
     private final MixinEnvironment environment;
 
-    private Level verboseLoggingLevel = Level.DEBUG;
+    private Logger.Level verboseLoggingLevel = Logger.Level.DEBUG;
 
     /**
      * Handling an error state, do not process further mixins
@@ -434,18 +428,19 @@ class MixinProcessor {
     private int transformedCount = 0;
 
     MixinProcessor(MixinEnvironment environment, Extensions extensions, IHotSwap hotSwapper, MixinCoprocessorNestHost nestHostCoprocessor) {
+        this.service = environment.getService();
+        this.logger = environment.getLogger();
         this.lock = this.service.getReEntranceLock();
 
         this.environment = environment;
         this.extensions = extensions;
         this.hotSwapper = hotSwapper;
         
-        this.coprocessors.add(new MixinCoprocessorPassthrough());
-        this.coprocessors.add(new MixinCoprocessorSyntheticInner());
-        this.coprocessors.add(new MixinCoprocessorAccessor(this.sessionId));
+        this.coprocessors.add(new MixinCoprocessorPassthrough(environment));
+        this.coprocessors.add(new MixinCoprocessorSyntheticInner(environment));
+        this.coprocessors.add(new MixinCoprocessorAccessor(environment, this.sessionId));
         this.coprocessors.add(nestHostCoprocessor);
-        
-        this.profiler = Profiler.getProfiler("mixin");
+
         this.auditTrail = this.service.getAuditTrail();
     }
 
@@ -455,7 +450,7 @@ class MixinProcessor {
      * @param environment current environment
      */
     public void audit(MixinEnvironment environment) {
-        ILogger auditLogger = MixinService.getService().getLogger("mixin.audit");
+        Logger auditLogger = service.getLogger("mixin.audit");
 
         for (String target : unhandledTargets) {
             try {
@@ -470,10 +465,6 @@ class MixinProcessor {
             ClassAlreadyLoadedException ex = new ClassAlreadyLoadedException(target + " was already classloaded");
             auditLogger.error("Could not force-load " + target, ex);
         }
-        
-        if (environment.getOption(Option.DEBUG_PROFILER)) {
-            Profiler.printAuditSummary();
-        }
     }
 
     synchronized boolean applyMixins(String name, ClassNode targetClassNode) {
@@ -482,13 +473,13 @@ class MixinProcessor {
         }
         
         boolean locked = this.lock.push().check();
-        Section mixinTimer = this.profiler.begin("mixin");
+        var mixinTimer = environment.profilerBegin();
 
         if (locked) {
             for (ConfigWrapper config : this.pendingConfigs) {
                 if (config.hasPendingMixinsFor(name)) {
                     ReEntrantTransformerError error = new ReEntrantTransformerError("Re-entrance error.");
-                    MixinProcessor.logger.warn("Re-entrance detected during prepare phase, this will cause serious problems.", error);
+                    logger.warn("Re-entrance detected during prepare phase, this will cause serious problems.", error);
                     throw error;
                 }
             }
@@ -497,7 +488,6 @@ class MixinProcessor {
                 this.setup();
             } catch (Exception ex) {
                 this.lock.pop();
-                mixinTimer.end();
                 throw new MixinException(ex);
             }
         }
@@ -505,7 +495,7 @@ class MixinProcessor {
         boolean transformed = false;
         
         try {
-            ProcessResult result = this.coprocessors.process(name, targetClassNode);
+            MixinCoprocessor.ProcessResult result = this.coprocessors.process(environment, name, targetClassNode);
             transformed |= result.isTransformed();
             
             if (result.isPassthrough()) {
@@ -557,7 +547,7 @@ class MixinProcessor {
                 // Re-entrance is "safe" as long as we don't need to apply any mixins, if there are mixins then we need to panic now
                 if (locked) {
                     ReEntrantTransformerError error = new ReEntrantTransformerError("Re-entrance error.");
-                    MixinProcessor.logger.warn("Re-entrance detected, this will cause serious problems.", error);
+                    logger.warn("Re-entrance detected, this will cause serious problems.", error);
                     throw error;
                 }
 
@@ -569,7 +559,7 @@ class MixinProcessor {
                     TargetClassContext context = new TargetClassContext(environment, this.extensions, this.sessionId, name, targetClassNode, mixins);
                     context.applyMixins();
                     
-                    transformed |= this.coprocessors.postProcess(name, targetClassNode);
+                    transformed |= this.coprocessors.postProcess(environment, name, targetClassNode);
 
                     if (context.isExported()) {
                         this.extensions.export(environment, context.getClassName(), context.isExportForced(), context.getClassNode());
@@ -587,7 +577,7 @@ class MixinProcessor {
                 }
             } else {
                 // No mixins, but still need to run postProcess stage of coprocessors
-                if (this.coprocessors.postProcess(name, targetClassNode)) {
+                if (this.coprocessors.postProcess(environment, name, targetClassNode)) {
                     transformed = true;
                     this.extensions.export(environment, name, false, targetClassNode);
                 }
@@ -599,7 +589,7 @@ class MixinProcessor {
             throw new MixinTransformerError("An unexpected critical error was encountered", th);
         } finally {
             this.lock.pop();
-            mixinTimer.end();
+            environment.profilerEnd(ProfilerSection.MIXIN, mixinTimer);
         }
         return transformed;
     }
@@ -641,34 +631,18 @@ class MixinProcessor {
     }
 
     private void setup() {
-        this.verboseLoggingLevel = (environment.getOption(Option.DEBUG_VERBOSE)) ? Level.INFO : Level.DEBUG;
+        this.verboseLoggingLevel = (environment.getOption(Option.DEBUG_VERBOSE)) ? Logger.Level.INFO : Logger.Level.DEBUG;
 
-        this.profiler.setActive(true);
-        this.profiler.mark("prepare");
-        Section prepareTimer = this.profiler.begin("prepare");
+        var timer = environment.profilerBegin();
         
         this.setupConfigs();
         this.extensions.select(environment);
         int totalMixins = this.prepareConfigs();
         this.transformedCount = 0;
 
-        prepareTimer.end();
-        
-        long elapsedMs = prepareTimer.getTime();
-        double elapsedTime = prepareTimer.getSeconds();
-        if (elapsedTime > 0.25D) {
-            long loadTime = this.profiler.get("class.load").getTime();
-            long transformTime = this.profiler.get("class.transform").getTime();
-            long pluginTime = this.profiler.get("mixin.plugin").getTime();
-            String elapsed = new DecimalFormat("###0.000").format(elapsedTime);
-            String perMixinTime = new DecimalFormat("###0.0").format(((double)elapsedMs) / totalMixins);
-            
-            MixinProcessor.logger.log(this.verboseLoggingLevel, "Prepared {} mixins in {} sec ({}ms avg) ({}ms load, {}ms transform, {}ms plugin)",
-                    totalMixins, elapsed, perMixinTime, loadTime, transformTime, pluginTime);
-        }
+        environment.profilerEnd(ProfilerSection.PROCESSOR_PREPARE, timer);
 
-        this.profiler.mark(environment.getPhase().toString() + ":apply");
-        Profiler.setActive(environment.getOption(Option.DEBUG_PROFILER));
+        logger.log(this.verboseLoggingLevel, "Prepared {} mixins", totalMixins);
     }
 
     /**
@@ -678,7 +652,7 @@ class MixinProcessor {
      */
     private void setupConfigs() {
         for (IMixinConfig config : environment.getMixinConfigs()) {
-            MixinProcessor.logger.log(this.verboseLoggingLevel, "Selecting config {}", config);
+            logger.log(this.verboseLoggingLevel, "Selecting config {}", config);
             this.pendingConfigs.add(new ConfigWrapper(this, config));
         }
 
@@ -697,7 +671,7 @@ class MixinProcessor {
         final IHotSwap hotSwapper = this.hotSwapper;
         for (ConfigWrapper config : this.pendingConfigs) {
             for (MixinCoprocessor coprocessor : this.coprocessors) {
-                config.addListener(coprocessor);
+                config.getConfig().addListener(coprocessor);
             }
             if (hotSwapper != null) {
                 config.getConfig().addListener(new IMixinConfig.IListener() {
@@ -714,14 +688,14 @@ class MixinProcessor {
         
         for (ConfigWrapper config : this.pendingConfigs) {
             try {
-                MixinProcessor.logger.log(this.verboseLoggingLevel, "Preparing {} ({})", config, config.getDeclaredMixinCount());
-                config.prepare(extensions);
-                totalMixins += config.getMixinCount();
+                logger.log(this.verboseLoggingLevel, "Preparing {} ({})", config, config.getConfig().getClasses().size());
+                config.prepare();
+                totalMixins += config.mixins.size();
             } catch (InvalidMixinException ex) {
                 this.handleMixinPrepareError(config, ex, environment);
             } catch (Exception ex) {
                 String message = ex.getMessage();
-                MixinProcessor.logger.error("Error encountered whilst initialising mixin config '" + config.getConfig().getName() + "': " + message, ex);
+                logger.error("Error encountered whilst initialising mixin config '" + config.getConfig().getName() + "': " + message, ex);
             }
         }
         
@@ -743,12 +717,12 @@ class MixinProcessor {
 
         for (ConfigWrapper config : this.pendingConfigs) {
             try {
-                config.postInitialise(this.extensions);
+                config.postInitialise();
             } catch (InvalidMixinException ex) {
                 this.handleMixinPrepareError(config, ex, environment);
             } catch (Exception ex) {
                 String message = ex.getMessage();
-                MixinProcessor.logger.error("Error encountered during mixin config postInit step'" + config.getConfig().getName() + "': " + message, ex);
+                logger.error("Error encountered during mixin config postInit step'" + config.getConfig().getName() + "': " + message, ex);
             }
         }
         
@@ -773,7 +747,7 @@ class MixinProcessor {
         IMixinInfo mixin = ex.getMixin();
         
         if (mixin == null) {
-            MixinProcessor.logger.error("InvalidMixinException has no mixin!", ex);
+            logger.error("InvalidMixinException has no mixin!", ex);
             throw ex;
         }
         
@@ -795,7 +769,7 @@ class MixinProcessor {
                 .addWrapped("    %s", ex.getMessage())
                 .hr('-')
                 .add(ex, 8)
-                .log(action.logLevel);
+                .log(logger, action.logLevel);
         }
     
         for (IMixinErrorHandler handler : this.getErrorHandlers()) {
@@ -805,7 +779,7 @@ class MixinProcessor {
             }
         }
         
-        MixinProcessor.logger.log(action.logLevel, errorPhase.getLogMessage(context, ex, mixin), ex);
+        logger.log(action.logLevel, errorPhase.getLogMessage(context, ex, mixin), ex);
         
         this.errorState = false;
 
@@ -819,7 +793,7 @@ class MixinProcessor {
         
         for (String handlerClassName : environment.getErrorHandlerClasses()) {
             try {
-                MixinProcessor.logger.info("Instancing error handler class {}", handlerClassName);
+                logger.info("Instancing error handler class {}", handlerClassName);
                 Class<?> handlerClass = this.service.getClassProvider().findClass(handlerClassName, true);
                 IMixinErrorHandler handler = (IMixinErrorHandler)handlerClass.getDeclaredConstructor().newInstance();
                 if (handler != null) {

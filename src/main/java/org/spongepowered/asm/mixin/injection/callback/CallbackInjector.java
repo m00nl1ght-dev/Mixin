@@ -402,7 +402,7 @@ public class CallbackInjector extends Injector {
             
             String existingId = this.ids.get(Integer.valueOf(injectionNode.getId()));
             if (existingId != null && !existingId.equals(id)) {
-                Injector.logger.warn("Conflicting id for {} insn in {}, found id {} on {}, previously defined as {}", Bytecode.getOpcodeName(node),
+                logger.warn("Conflicting id for {} insn in {}, found id {} on {}, previously defined as {}", Bytecode.getOpcodeName(node),
                         target.toString(), id, this.info, existingId);
                 break;
             }
@@ -476,15 +476,15 @@ public class CallbackInjector extends Injector {
                     
                     switch (this.localCapture) {
                         case CAPTURE_FAILEXCEPTION:
-                            Injector.logger.error("Injection error: {}", message);
+                            logger.error("Injection error: {}", message);
                             callbackMethod = this.generateErrorMethod(callback, "org/spongepowered/asm/mixin/injection/throwables/InjectionError",
                                     message);
                             break;
                         case CAPTURE_FAILSOFT:
-                            Injector.logger.warn("Injection warning: {}", message);
+                            logger.warn("Injection warning: {}", message);
                             return;
                         default:
-                            Injector.logger.error("Critical injection failure: {}", message);
+                            logger.error("Critical injection failure: {}", message);
                             throw new InjectionError(message);
                     }
                 }

@@ -24,30 +24,26 @@
  */
 package org.spongepowered.asm.mixin.injection.invoke.arg;
 
-import java.util.HashMap;
-import java.util.Map;
-
-import org.spongepowered.asm.logging.ILogger;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
+import dev.m00nl1ght.clockwork.utils.logger.Logger;
+import org.objectweb.asm.*;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.util.CheckClassAdapter;
 import org.spongepowered.asm.mixin.MixinEnvironment;
-import org.spongepowered.asm.mixin.MixinEnvironment.Option;
+import org.spongepowered.asm.mixin.ProfilerSection;
 import org.spongepowered.asm.mixin.extensibility.IMixinInfo;
 import org.spongepowered.asm.mixin.injection.ModifyArgs;
 import org.spongepowered.asm.mixin.transformer.SyntheticClassInfo;
 import org.spongepowered.asm.mixin.transformer.ext.IClassGenerator;
 import org.spongepowered.asm.service.ISyntheticClassInfo;
-import org.spongepowered.asm.service.MixinService;
 import org.spongepowered.asm.util.Bytecode;
 import org.spongepowered.asm.util.Constants;
 import org.spongepowered.asm.util.IConsumer;
 import org.spongepowered.asm.util.SignaturePrinter;
 import org.spongepowered.asm.util.asm.MethodVisitorEx;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 /**
  * Class generator which creates subclasses of {@link Args} to be used by the
@@ -85,11 +81,6 @@ public final class ArgsClassGenerator implements IClassGenerator {
     
     private static final String ACE = "org/spongepowered/asm/mixin/injection/invoke/arg/ArgumentCountException";
     private static final String ACE_CTOR_DESC = "(IILjava/lang/String;)V";
-    
-    /**
-     * Logger
-     */
-    private static final ILogger logger = MixinService.getService().getLogger("mixin");
 
     /**
      * Synthetic class info for args class
@@ -125,6 +116,8 @@ public final class ArgsClassGenerator implements IClassGenerator {
 
     private final boolean verify;
 
+    private final MixinEnvironment environment;
+
     /**
      * The next subclass number, classes generated in sequence eg.
      * <tt>Args$1</tt>, <tt>Args$2</tt>, etc. 
@@ -143,12 +136,14 @@ public final class ArgsClassGenerator implements IClassGenerator {
     
     /**
      * Ctor
-     * 
+     *
+     * @param logger
      * @param registry sythetic class registry
      */
-    public ArgsClassGenerator(IConsumer<ISyntheticClassInfo> registry, boolean verify) {
+    public ArgsClassGenerator(MixinEnvironment environment, IConsumer<ISyntheticClassInfo> registry) {
+        this.environment = Objects.requireNonNull(environment);
         this.registry = registry;
-        this.verify = verify;
+        this.verify = environment.getOption(MixinEnvironment.Option.DEBUG_VERIFY);
     }
     
     /* (non-Javadoc)
@@ -177,7 +172,7 @@ public final class ArgsClassGenerator implements IClassGenerator {
         ArgsClassInfo info = this.descToClass.get(voidDesc);
         if (info == null) {
             String name = String.format("%s%d", ArgsClassGenerator.CLASS_NAME_BASE, this.nextIndex++);
-            ArgsClassGenerator.logger.debug("ArgsClassGenerator assigning {} for descriptor {}", name, voidDesc);
+            environment.getLogger().debug("ArgsClassGenerator assigning {} for descriptor {}", name, voidDesc);
             info = new ArgsClassInfo(mixin, name, voidDesc);
             this.descToClass.put(voidDesc, info);
             this.nameToClass.put(name, info);
@@ -198,8 +193,10 @@ public final class ArgsClassGenerator implements IClassGenerator {
         }
         
         if (info.loaded > 0) {
-            ArgsClassGenerator.logger.debug("ArgsClassGenerator is re-generating {}, already did this {} times!", name, info.loaded);
+            environment.getLogger().debug("ArgsClassGenerator is re-generating {}, already did this {} times!", name, info.loaded);
         }
+
+        var timer = environment.profilerBegin();
         
         ClassVisitor visitor = classNode;
         if (verify) {
@@ -218,6 +215,8 @@ public final class ArgsClassGenerator implements IClassGenerator {
         
         visitor.visitEnd();
         info.loaded++;
+
+        environment.profilerEnd(ProfilerSection.GENERATE_ARGS, timer);
         
         return true;
     }
